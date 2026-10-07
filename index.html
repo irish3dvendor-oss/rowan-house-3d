@@ -1,0 +1,1665 @@
+<title>Rowan House</title>
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Figtree:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --map: 212px;
+    --slate: #1d2326;
+    --slate-2: #2a3236;
+    --panel: rgba(24, 30, 33, 0.78);
+    --panel-edge: rgba(243, 241, 234, 0.10);
+    --render: #f3f1ea;
+    --mist: #aab5b8;
+    --oak: #c9873b;
+    --oak-soft: rgba(201, 135, 59, 0.22);
+    --focus: #f1c27d;
+    color-scheme: dark;
+  }
+  html, body { height: 100%; }
+  body {
+    margin: 0; overflow: hidden; background: var(--slate); color: var(--render);
+    font: 15px/1.4 Figtree, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none;
+    touch-action: none;
+  }
+  #view { position: fixed; inset: 0; width: 100%; height: 100%; display: block; outline: none; }
+  .ui { position: fixed; z-index: 5; }
+  .card {
+    background: var(--panel); border: 1px solid var(--panel-edge); border-radius: 14px;
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  }
+  #id {
+    top: calc(12px + env(safe-area-inset-top, 0px)); left: calc(12px + env(safe-area-inset-left, 0px));
+    padding: 10px 14px 11px; max-width: min(320px, calc(100vw - var(--map) - 48px));
+  }
+  #id h1 {
+    margin: 0; font: 700 19px/1.1 "Bricolage Grotesque", Figtree, system-ui, sans-serif; letter-spacing: 0.1px;
+    text-wrap: balance;
+  }
+  #id .sub { margin-top: 3px; color: var(--mist); font-size: 12.5px; }
+  #id .facts { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 12px; color: var(--render); }
+  #id .facts span { white-space: nowrap; font-variant-numeric: tabular-nums; }
+  #where {
+    margin-top: 8px; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--focus);
+    text-transform: uppercase; letter-spacing: 0.9px; font-weight: 600;
+  }
+  #where::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--oak); }
+  #right {
+    top: calc(12px + env(safe-area-inset-top, 0px)); right: calc(12px + env(safe-area-inset-right, 0px));
+    display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
+  }
+  #tools { display: flex; gap: 8px; }
+  /* eye button: a clear view -- panels fade out, the tools stay */
+  #id, #map, #rooms, #hint { transition: opacity .25s ease; }
+  body.clear-view #id, body.clear-view #map, body.clear-view #rooms, body.clear-view #hint { opacity: 0 !important; pointer-events: none; }
+  /* inside an app's WebView the app puts its close button top-left: the name card goes below it */
+  .in-app #id { top: calc(64px + env(safe-area-inset-top, 0px)); }
+  #map { width: var(--map); padding: 6px; transition: width .25s ease; }
+  #map .bar { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 1px 2px 6px 4px; }
+  #map .lvl {
+    font: 600 11px/1.2 Figtree, system-ui, sans-serif; letter-spacing: 0.9px; text-transform: uppercase;
+    color: var(--focus); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  #map .btns { display: flex; gap: 4px; flex: none; }
+  .mini-btn {
+    width: 26px; height: 26px; display: grid; place-items: center; padding: 0; cursor: pointer; color: var(--render);
+    border: 1px solid var(--panel-edge); border-radius: 8px; background: rgba(243, 241, 234, 0.06);
+  }
+  .mini-btn svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+  .mini-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  #mapc {
+    display: block; width: 100%; aspect-ratio: 1 / 1; border-radius: 9px; cursor: crosshair; touch-action: none;
+    background: #10171a;
+  }
+  #map.big { --map: min(86vw, 64vh, 560px); }
+  .icon-btn {
+    width: 42px; height: 42px; display: grid; place-items: center; cursor: pointer; color: var(--render);
+    background: var(--panel); border: 1px solid var(--panel-edge); border-radius: 12px; padding: 0;
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  }
+  .icon-btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+  .icon-btn:focus-visible, .chip:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  #rooms {
+    left: 0; right: 0; bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    display: flex; justify-content: center; padding-inline: 12px;
+  }
+  #rooms .track {
+    display: flex; gap: 6px; padding: 6px; overflow-x: auto; scrollbar-width: none; max-width: 100%;
+  }
+  #rooms .track::-webkit-scrollbar { display: none; }
+  .chip {
+    flex: none; border: 1px solid transparent; background: transparent; color: var(--render); cursor: pointer;
+    font: 600 13.5px/1 Figtree, system-ui, sans-serif; padding: 10px 13px; border-radius: 10px; white-space: nowrap;
+  }
+  .chip:hover { background: rgba(243, 241, 234, 0.07); }
+  .chip[aria-pressed="true"] { background: var(--oak-soft); border-color: rgba(201, 135, 59, 0.55); color: #ffe2bb; }
+  #hint {
+    left: 50%; transform: translateX(-50%); bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+    padding: 9px 14px; font-size: 13px; color: var(--render); text-align: center; max-width: calc(100vw - 32px);
+    transition: opacity .6s ease;
+  }
+  #hint b { color: var(--focus); font-weight: 600; }
+  #hint.gone { opacity: 0; pointer-events: none; }
+  /* phone joystick: always on screen, bottom-left just above the room chips (shown once a touch screen is seen) */
+  #stick {
+    position: fixed; z-index: 4; width: 116px; height: 116px; border-radius: 50%; display: none;
+    left: calc(18px + env(safe-area-inset-left, 0px)); bottom: calc(114px + env(safe-area-inset-bottom, 0px));
+    border: 1.5px solid rgba(243, 241, 234, 0.35); background: rgba(24, 30, 33, 0.25); pointer-events: none;
+  }
+  .touch #stick { display: block; }
+  .touch #hint { bottom: calc(242px + env(safe-area-inset-bottom, 0px)); }
+  #stick i {
+    position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%;
+    background: rgba(243, 241, 234, 0.55);
+  }
+  #marker {
+    position: fixed; z-index: 3; width: 34px; height: 34px; margin: -17px 0 0 -17px; border-radius: 50%;
+    border: 2px solid var(--focus); pointer-events: none; opacity: 0; transition: opacity .25s;
+  }
+  #loader {
+    position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 24px;
+    background: radial-gradient(120% 90% at 50% 20%, #2c3438 0%, var(--slate) 60%);
+    transition: opacity .7s ease;
+  }
+  #loader.done { opacity: 0; pointer-events: none; }
+  #loader .box { width: min(360px, 100%); display: grid; gap: 14px; }
+  #loader h2 { margin: 0; font: 700 30px/1.05 "Bricolage Grotesque", Figtree, system-ui, sans-serif; text-wrap: balance; }
+  #loader p { margin: 0; color: var(--mist); font-size: 14px; }
+  #bar { height: 4px; border-radius: 4px; background: rgba(243, 241, 234, 0.12); overflow: hidden; }
+  #bar i { display: block; height: 100%; width: 0; background: var(--oak); transition: width .3s ease; }
+  #status { font-size: 12.5px; color: var(--mist); font-variant-numeric: tabular-nums; min-height: 1.4em; }
+  #err { color: #ffb4a3; font-size: 13px; }
+  @media (max-width: 520px) {
+    :root { --map: 138px; }
+    #id .sub { display: none; }
+    .icon-btn { width: 38px; height: 38px; }
+    #id { padding: 8px 12px 9px; }
+    #id h1 { font-size: 17px; }
+    #id .facts { display: none; }
+    .chip { padding: 9px 11px; font-size: 13px; }
+  }
+  @media (prefers-reduced-motion: reduce) { #hint, #loader, #bar i { transition: none; } }
+</style>
+
+<canvas id="view" tabindex="0" aria-label="3D walkthrough of Rowan House"></canvas>
+
+<div id="id" class="ui card">
+  <h1>Rowan House</h1>
+  <div class="sub">Farmhouse with a stone cottage wing, Curranes, Co. Kerry</div>
+  <div class="facts"><span>Sleeps 7</span><span>4 bedrooms</span><span>2 bathrooms</span></div>
+  <div id="where">Outside</div>
+</div>
+
+<div id="right" class="ui">
+  <div id="map" class="card">
+    <div class="bar">
+      <span id="maplvl" class="lvl">Grounds</span>
+      <span class="btns">
+        <button id="mapfloor" class="mini-btn" type="button" aria-label="Show another floor" title="Show another floor">
+          <svg viewBox="0 0 24 24"><path d="m12 4 8 4-8 4-8-4 8-4Zm-8 8 8 4 8-4M4 16l8 4 8-4"/></svg>
+        </button>
+        <button id="mapbig" class="mini-btn" type="button" aria-label="Enlarge map" aria-pressed="false" title="Enlarge map">
+          <svg viewBox="0 0 24 24"><path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/></svg>
+        </button>
+      </span>
+    </div>
+    <canvas id="mapc" aria-label="Map. Tap a spot to walk there."></canvas>
+  </div>
+  <div id="tools">
+    <button id="clear" class="icon-btn" type="button" aria-label="Hide the panels" title="Hide the panels">
+      <svg viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+    </button>
+    <button id="fs" class="icon-btn" type="button" aria-label="Full screen" title="Full screen">
+      <svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+    </button>
+  </div>
+</div>
+
+<nav id="rooms" class="ui" aria-label="Rooms">
+  <div class="track card" role="group">
+    <button class="chip" type="button" data-room="outside" aria-pressed="true">Outside</button>
+    <button class="chip" type="button" data-room="kitchen" aria-pressed="false">Kitchen</button>
+    <button class="chip" type="button" data-room="dining" aria-pressed="false">Dining</button>
+    <button class="chip" type="button" data-room="sitting" aria-pressed="false">Sitting room</button>
+    <button class="chip" type="button" data-room="wet" aria-pressed="false">Wet room</button>
+    <button class="chip" type="button" data-room="bed1" aria-pressed="false">Bedroom 1</button>
+    <button class="chip" type="button" data-room="bed2" aria-pressed="false">Bedroom 2</button>
+    <button class="chip" type="button" data-room="bed3" aria-pressed="false">Bedroom 3</button>
+    <button class="chip" type="button" data-room="bed4" aria-pressed="false">Bedroom 4</button>
+    <button class="chip" type="button" data-room="bath" aria-pressed="false">Bathroom</button>
+    <button class="chip" type="button" data-room="patio" aria-pressed="false">Patio</button>
+  </div>
+</nav>
+
+<div id="hint" class="ui card"></div>
+<div id="stick"><i></i></div>
+<div id="marker"></div>
+
+<div id="loader">
+  <div class="box">
+    <h2>Rowan House</h2>
+    <p>An unofficial 3D reconstruction built from the listing photos, not to scale. The lighting is pre-rendered, so loading can take a moment on slower connections.</p>
+    <div id="bar"><i></i></div>
+    <div id="status">Starting&hellip;</div>
+    <div id="err" hidden></div>
+  </div>
+</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { Reflector } from 'three/addons/objects/Reflector.js';
+
+// ------------------------------------------------------------------ device profile
+const COARSE = matchMedia('(pointer: coarse)').matches;
+if (COARSE) document.documentElement.classList.add('touch');
+const MOBILE = COARSE || Math.min(screen.width, screen.height) < 700;
+const Q = MOBILE ? 'lo' : 'hi';
+const VER = '?v=1.1';           // bump on every republish so browsers never mix old and new assets
+const $ = (s) => document.querySelector(s);
+const statusEl = $('#status'), barEl = $('#bar i');
+
+// ------------------------------------------------------------------ Blender -> three coordinates
+const B = (x, y, z) => new THREE.Vector3(x, z, -y);
+// house layout (metres, Blender axes: x along the house, y from the sea front backwards, z up) -- scripts/lib.py
+const FFL = 0.15, UFL = 2.80, CEIL = 2.55;
+const ST = { x0: 6.60, x1: 7.60, y0: 1.40, y1: 4.65 };       // stair against the yellow cross wall, rising +y
+const IN_KIT = (x, y) => x > 0.40 && x < 7.60 && y > 0.40 && y < 6.60;      // kitchen / dining / hall
+const IN_SIT = (x, y) => x > 7.95 && x < 12.00 && y > 0.40 && y < 6.60;     // sitting room
+const IN_PORCH = (x, y) => x > 4.90 && x < 6.40 && y > -1.45 && y < 0.0;
+const IN_RET = (x, y) => x > 3.90 && x < 7.30 && y > 7.00 && y < 9.60;     // utility lobby + wet room
+const IN_DOORS = (x, y) => (x > 5.00 && x < 5.80 && y >= -0.02 && y <= 0.42) ||   // porch -> kitchen
+  (x > 5.75 && x < 6.55 && y >= 6.58 && y <= 7.02) ||                              // kitchen -> rear return
+  (x >= 7.58 && x <= 7.97 && y > 5.30 && y < 6.10) ||                              // kitchen -> sitting room
+  (x >= 6.38 && x <= 6.67 && y > -1.30 && y < -0.40) ||                            // front door
+  (x >= 7.28 && x <= 7.62 && y > 7.55 && y < 8.35) ||                              // garden door
+  (x >= 5.33 && x <= 5.47 && y > 7.40 && y < 8.20);                                // wet-room doorway
+const INSIDE = (x, y) => IN_KIT(x, y) || IN_SIT(x, y) || IN_PORCH(x, y) || IN_RET(x, y) || IN_DOORS(x, y);
+// ground outside: the house, yard and gardens are level (z_ground in scripts/lib.py is 0 within 55 m)
+const sstep = (t) => { t = Math.max(0, Math.min(1, t)); return t * t * (3 - 2 * t); };
+function zGround(x, y) { return 0.0; }
+
+// ------------------------------------------------------------------ renderer / scene
+{
+  const ua = navigator.userAgent;
+  if (/; wv\)/.test(ua) || (/iPhone|iPad|iPod/.test(ua) && !/Safari\//.test(ua))) document.documentElement.classList.add('in-app');
+}
+const canvas = $('#view');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: !MOBILE || devicePixelRatio < 2, powerPreference: 'high-performance' });
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.NoToneMapping;
+let pixelRatio = Math.min(devicePixelRatio, MOBILE ? 1.6 : 2);
+renderer.setPixelRatio(pixelRatio);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xa9bcd0);
+const camera = new THREE.PerspectiveCamera(60, 1, 0.05, 3000);
+const maxAniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+
+// desktop: multisampled HDR buffer -> soft bloom around windows, lamps and sky -> gentle lens vignette
+const FX = !MOBILE && renderer.capabilities.isWebGL2;
+let composer = null, bloomPass = null;
+if (FX) {
+  const rt = new THREE.WebGLRenderTarget(innerWidth, innerHeight, { type: THREE.HalfFloatType, samples: 4 });
+  composer = new EffectComposer(renderer, rt);
+  composer.addPass(new RenderPass(scene, camera));
+  bloomPass = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.22, 0.45, 0.88);
+  composer.addPass(bloomPass);
+  composer.addPass(new ShaderPass({
+    uniforms: { tDiffuse: { value: null }, uK: { value: 0.2 } },
+    vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: `uniform sampler2D tDiffuse; uniform float uK; varying vec2 vUv;
+      void main() { vec4 c = texture2D(tDiffuse, vUv); vec2 d = vUv - 0.5;
+        gl_FragColor = vec4(c.rgb * (1.0 - uK * smoothstep(0.12, 0.5, dot(d, d) * 1.6)), c.a); }`,
+  }));
+  composer.addPass(new OutputPass());
+  composer.setPixelRatio(pixelRatio);
+}
+
+function resize() {
+  const w = innerWidth, h = innerHeight;
+  renderer.setSize(w, h, false);
+  if (composer) { composer.setPixelRatio(pixelRatio); composer.setSize(w, h); }
+  camera.aspect = w / h;
+  const hfov = 76 * Math.PI / 180;                     // keep a usable horizontal view on portrait phones
+  camera.fov = w >= h ? 62 : Math.min(96, THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(hfov / 2) / camera.aspect)));
+  camera.updateProjectionMatrix();
+  dirty = 3;
+}
+addEventListener('resize', resize);
+
+// ------------------------------------------------------------------ loading helpers
+const texLoader = new THREE.TextureLoader();
+let loadedCount = 0, totalCount = 1;
+function progress(label) {
+  loadedCount++;
+  barEl.style.width = Math.min(100, Math.round(100 * loadedCount / totalCount)) + '%';
+  statusEl.textContent = label;
+}
+function loadTex(url, { srgb = true, flip = false, repeat = false } = {}) {
+  return texLoader.loadAsync(url).then((t) => {
+    t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+    t.flipY = flip;
+    t.anisotropy = maxAniso;
+    if (repeat) t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.needsUpdate = true;
+    return t;
+  });
+}
+
+// ------------------------------------------------------------------ materials
+// Baked surfaces: the Cycles lightmap drives the emissive channel (all the diffuse light, shadows and bounce),
+// while a physically based specular layer adds what a bake cannot hold: view-dependent reflections with real
+// Fresnel, from parallax-corrected probes of each room. Tiled detail maps (normal + fine albedo from the same
+// photo-scanned textures used in Blender) keep fabrics, wood and plaster crisp at arm's length.
+const GROUPS = ['EXT', 'SITEN', 'GF', 'BATH', 'FF', 'SITEF', 'HOUSE'];
+const INTERIOR = new Set(['GF', 'FF', 'BATH']);
+// look matched to the listing photos (4 Oct 2026): rooms read brighter and a touch cooler than the raw bake
+const INT_GAIN = 1.5;                                 // indoors, everything is lifted by this as your eyes adjust
+const INT_WB = [0.96, 1.0, 1.05];                     // white balance for the interior lightmaps (less beige)
+const ZONE_WB = { BATH: [0.84, 0.98, 1.14] };          // the return: wet room orange bounce corrected like a camera
+const FLOOR_REFL = 1.0;                               // waxed quarry tiles: Croughmore's 2.0 mirrored furniture undersides as black blots
+const groupMats = Object.fromEntries(GROUPS.map((g) => [g, []]));
+const detailUsers = new Map();     // Poly Haven texture name -> [{mat, tile, rot, nstr}]
+const glassMats = [];
+let mirrorMat = null;
+
+// reflection probes (Blender coordinates): capture point + room box used for parallax correction
+const PROBES = {
+  GF: { p: [3.8, 3.5, 1.4], box: [0.40, 0.40, 0.15, 7.60, 6.60, 2.55] },
+  FF: { p: [5.0, 5.5, 4.3], box: [0.40, 0.40, 2.80, 12.00, 6.60, 5.20] },
+  BATH: { p: [5.5, 8.3, 1.4], box: [3.90, 7.00, 0.15, 7.30, 9.60, 2.50] },
+  FFB: { p: [1.7, 5.1, 4.1], box: [0.40, 3.70, 2.80, 2.60, 6.60, 5.20] },
+  EXT: { p: [4.0, -6.0, 1.7], box: null },
+};
+const ZONE_PROBE = { GF: 'GF', FF: 'FF', BATH: 'BATH', EXT: 'EXT', SITEN: 'EXT', SITEF: 'EXT', HOUSE: 'EXT' };
+const boxMin = (b) => new THREE.Vector3(b[0], b[2], -b[4]);
+const boxMax = (b) => new THREE.Vector3(b[3], b[5], -b[1]);
+
+const BOX_PROJ_PARS = `
+#ifdef BOX_PROJ
+uniform vec3 uBoxMin;
+uniform vec3 uBoxMax;
+uniform vec3 uProbePos;
+vec3 boxProject( vec3 dir ) {
+  vec3 d = normalize( dir );
+  vec3 p = clamp( vWPos, uBoxMin + 0.01, uBoxMax - 0.01 );
+  vec3 tMax = ( uBoxMax - p ) / d;
+  vec3 tMin = ( uBoxMin - p ) / d;
+  vec3 t = max( tMax, tMin );
+  float hit = min( min( t.x, t.y ), t.z );
+  return p + d * hit - uProbePos;
+}
+#endif
+`;
+
+function patchStd(m, g) {
+  const u = m.userData;
+  u.uDetK = { value: 0 };
+  u.uSpecOcc = { value: 1 };
+  u.uRoll = { value: INTERIOR.has(g) ? 1 : 0 };        // indoors: soft highlight roll-off (the lift would clip lamps to flat white)
+  const probe = PROBES[m.userData.probe || ZONE_PROBE[g]];
+  if (probe && probe.box) {
+    m.defines = { BOX_PROJ: '' };
+    u.uBoxMin = { value: boxMin(probe.box) };
+    u.uBoxMax = { value: boxMax(probe.box) };
+    u.uProbePos = { value: B(...probe.p) };
+  }
+  m.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, { uDetK: u.uDetK, uSpecOcc: u.uSpecOcc, uRoll: u.uRoll });
+    if (u.uBoxMin) Object.assign(sh.uniforms, { uBoxMin: u.uBoxMin, uBoxMax: u.uBoxMax, uProbePos: u.uProbePos });
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;')
+      .replace('#include <project_vertex>', '#include <project_vertex>\nvWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    const nmaps = THREE.ShaderChunk.normal_fragment_maps.replace(
+      'vec3 mapN = texture2D( normalMap, vNormalMapUv ).xyz * 2.0 - 1.0;',
+      `vec4 detTex = texture2D( normalMap, vNormalMapUv );
+      detailB = detTex.b;
+      vec3 mapN = vec3( detTex.xy * 2.0 - 1.0, 0.0 );
+      mapN.z = sqrt( max( 0.0, 1.0 - dot( mapN.xy, mapN.xy ) ) );`);
+    const envPars = THREE.ShaderChunk.envmap_physical_pars_fragment.replace(
+      /reflectVec = inverseTransformDirection\( reflectVec, viewMatrix \);/,
+      `reflectVec = inverseTransformDirection( reflectVec, viewMatrix );
+      #ifdef BOX_PROJ
+        reflectVec = boxProject( reflectVec );
+      #endif`);
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;\nuniform float uDetK;\nuniform float uSpecOcc;\nuniform float uRoll;\n' + BOX_PROJ_PARS)
+      .replace('#include <envmap_physical_pars_fragment>', envPars)
+      .replace('#include <normal_fragment_maps>', 'float detailB = 0.5;\n' + nmaps)
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+        totalEmissiveRadiance *= 1.0 + ( detailB - 0.5 ) * 2.0 * uDetK;
+        float lmPk = max( max( totalEmissiveRadiance.r, totalEmissiveRadiance.g ), totalEmissiveRadiance.b );
+        if ( uRoll > 0.5 && lmPk > 0.7 ) totalEmissiveRadiance *= ( 0.7 + 0.3 * ( 1.0 - exp( ( 0.7 - lmPk ) / 0.3 ) ) ) / lmPk;`)
+      .replace('#include <aomap_fragment>', `#include <aomap_fragment>
+        float lmL = dot( totalEmissiveRadiance, vec3( 0.2126, 0.7152, 0.0722 ) ) / max( emissive.r, 0.05 );
+        reflectedLight.indirectSpecular *= mix( 1.0, 0.2 + 0.8 * smoothstep( 0.0, 0.2, lmL ), uSpecOcc );`);
+  };
+  m.customProgramCacheKey = () => 'lodge-std-1';
+}
+
+function webMaterial(name) {
+  if (name.startsWith('GLASS|')) {
+    const kind = name.split('|')[1];
+    const m = new THREE.MeshBasicMaterial({
+      color: kind === 'glass_dark' ? 0x111111 : 0xffffff, transparent: true,
+      opacity: kind === 'glass_obscure' ? 0.55 : kind === 'glass_dark' ? 0.55 : 0.07,
+      depthWrite: false, side: THREE.DoubleSide, combine: THREE.AddOperation, reflectivity: 0.35,
+    });
+    glassMats.push(m);
+    return m;
+  }
+  if (name.startsWith('MIRROR')) {
+    mirrorMat = new THREE.MeshBasicMaterial({ color: 0xffffff, combine: THREE.MixOperation, reflectivity: 1.0 });
+    return mirrorMat;
+  }
+  // "GF;r=0.30;m=0;d=oak_veneer_01,1.1,0,0.6,0.35"
+  const parts = name.split(';'), g = parts[0], kv = {};
+  for (const p of parts.slice(1)) { const i = p.indexOf('='); kv[p.slice(0, i)] = p.slice(i + 1); }
+  const rough = kv.r !== undefined ? parseFloat(kv.r) : 0.9, metal = kv.m ? parseFloat(kv.m) : 0;
+  const fabric = rough >= 0.99 && INTERIOR.has(g);
+  const params = {
+    color: metal > 0 ? new THREE.Color(metal, metal, metal) : 0x000000, metalness: metal > 0 ? 1 : 0,
+    roughness: Math.max(0.04, rough), emissive: 0x8a8a86, emissiveIntensity: 1,
+  };
+  // fabrics: soft sheen at grazing angles (what makes a sofa or a duvet read as cloth rather than plastic)
+  const m = fabric ? new THREE.MeshPhysicalMaterial({ ...params, sheen: 1, sheenColor: new THREE.Color(0.32, 0.32, 0.32), sheenRoughness: 0.55 })
+    : new THREE.MeshStandardMaterial(params);
+  m.userData.group = g;
+  m.userData.srcName = name;
+  if (g === 'FF' && metal > 0) m.userData.probe = 'FFB';   // upstairs metal is in the bathroom
+  patchStd(m, g);
+  // specular occlusion dims reflections where the lightmap is dark. Metal is dark in a lightmap by nature (it has
+  // no diffuse colour), so it must not be occluded, or the hood, sink and taps lose their reflections and look black.
+  m.userData.floorTile = INTERIOR.has(g) && Math.abs(rough - 0.07) < 0.005;
+  m.userData.uSpecOcc.value = metal > 0 ? 0.0 : m.userData.floorTile ? 0.1 : rough > 0.15 ? 1.0 : 0.35;
+  if (kv.d) {
+    const [tex, tile, rot, nstr, vr] = kv.d.split(',');
+    const e = { mat: m, tile: parseFloat(tile), rot: parseFloat(rot) || 0, nstr: parseFloat(nstr), var: parseFloat(vr) };
+    (detailUsers.get(tex) || detailUsers.set(tex, []).get(tex)).push(e);
+  }
+  if (groupMats[g]) groupMats[g].push(m);
+  return m;
+}
+
+// tiled detail maps, attached once everything else has loaded
+function applyDetail(tex, t) {
+  for (const e of detailUsers.get(tex) || []) {
+    const c = t.clone();
+    c.channel = 1;
+    c.repeat.set(1 / e.tile, 1 / e.tile);
+    c.rotation = e.rot * Math.PI / 180;
+    c.needsUpdate = true;
+    const k = THREE.MathUtils.clamp(e.nstr, 0.15, 1.6);
+    e.mat.normalMap = c;
+    e.mat.normalScale.set(k, -k);
+    e.mat.userData.uDetK.value = THREE.MathUtils.clamp(e.var * 1.6, 0.12, 0.7);
+    e.mat.needsUpdate = true;
+  }
+}
+
+// ------------------------------------------------------------------ walkable space (Blender coordinates)
+const R = 0.20;   // body radius
+const rect = (x0, x1, y0, y1) => ({ x0, x1, y0, y1 });
+const inR = (r, x, y, m = 0) => x > r.x0 - m && x < r.x1 + m && y > r.y0 - m && y < r.y1 + m;
+const circ = (x, y, r) => ({ x, y, r });
+const inC = (c, x, y, m = 0) => (x - c.x) ** 2 + (y - c.y) ** 2 < (c.r + m) ** 2;
+function segDist(px, py, ax, ay, bx, by) {
+  const dx = bx - ax, dy = by - ay, t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy)));
+  return Math.hypot(px - ax - t * dx, py - ay - t * dy);
+}
+
+// ground floor obstacles -- scripts/interior_gf.py, interior_ret.py, openings.py (every door stands open)
+const GF_BLOCK = [
+  rect(0.40, 1.16, 2.40, 4.60),                                              // inglenook + oak beam
+  rect(0.40, 1.00, 4.65, 6.60), rect(1.00, 5.60, 6.00, 6.60),                // kitchen run + tall unit
+  rect(5.73, 5.83, 5.80, 6.60),                                              // back door, open beside the tall unit
+  rect(0.40, 0.85, 1.20, 1.90), circ(1.25, 0.95, 0.38),                      // pine cabinet, rocking chair
+  rect(1.61, 4.61, 1.27, 3.13),                                              // dining table + chairs
+  rect(6.36, 7.60, 1.37, 1.66), rect(6.60, 7.60, 1.37, 4.65),                // rounded bottom step + newel, stair (walked in its lane)
+  rect(2.25, 3.15, 0.40, 0.52), rect(1.82, 2.24, 0.40, 0.56), rect(3.16, 3.58, 0.40, 0.56),   // radiator, curtains
+];
+const SIT_BLOCK = [
+  rect(7.95, 8.82, 2.70, 4.30), rect(7.95, 8.40, 1.20, 2.30), rect(7.95, 8.33, 4.45, 5.13),   // fire + hearth, TV, books
+  rect(9.00, 11.30, 5.68, 6.60), rect(11.10, 12.00, 2.40, 4.20), rect(11.60, 12.00, 4.32, 4.68), // sofas, side table
+  circ(11.00, 1.30, 0.58), rect(9.35, 10.35, 3.20, 3.80), circ(11.80, 5.05, 0.18),            // armchair, table, lamp
+  rect(7.95, 8.75, 6.03, 6.13),                                                               // door, open along the back
+  rect(9.55, 10.45, 0.40, 0.52), rect(9.12, 9.54, 0.40, 0.56), rect(10.46, 10.88, 0.40, 0.56), // radiator, curtains
+];
+const PORCH_BLOCK = [rect(4.90, 5.08, -0.80, 0.0)];                         // inner door, open against the west wall
+const RET_BLOCK = [
+  rect(5.35, 5.45, 7.00, 7.40), rect(5.35, 5.45, 8.20, 9.60),               // partition (the wet-room doorway between)
+  rect(5.48, 7.30, 9.00, 9.60),                                              // washer, fridge, worktop
+  rect(3.90, 4.35, 7.16, 7.78), rect(4.40, 4.90, 7.00, 7.70), rect(3.90, 4.03, 7.95, 8.30),   // vanity, WC, radiator
+  rect(3.90, 4.55, 8.50, 8.70),                                              // drawn shower curtain (no door leaf)
+];
+let TREES_BLOCK = [];
+// outside: the house and cottage, outbuildings, the stone wall, the patio table, the closed gate and the drive beyond
+const OUT_BLOCK_R = [rect(0.0, 12.4, 0.0, 7.0), rect(4.65, 6.65, -1.7, 0.0), rect(3.6, 7.6, 7.0, 9.9),
+  rect(-7.2, 0.0, 0.3, 6.3), rect(-1.05, 0.0, -0.55, 0.30), rect(-8.0, -7.2, -0.25, 0.30),
+  rect(12.75, 13.35, -0.70, 1.70), rect(14.8, 18.4, 3.6, 6.6), rect(14.9, 17.1, 2.05, 3.15), rect(13.7, 14.6, 4.1, 5.7),
+  rect(19.30, 21.10, -4.62, -3.18), rect(-8.6, -7.62, -10.9, 0.45)];
+const OUT_BLOCK_C = [circ(20.0, 8.0, 0.2), circ(22.7, -1.2, 1.05)];
+
+// level 0: outside + ground floor; level 1: upstairs (scripts/shell.py first-floor partitions, interior_ff_rh.py)
+const LANE_X0 = 6.85, LANE_X1 = 7.35;
+const STAIR_LANE0 = (x, y) => x > LANE_X0 && x < LANE_X1 && y > 1.00 && y < 4.48;   // ground floor: up to the top
+const STAIR_LANE1 = (x, y) => x > LANE_X0 && x < LANE_X1 && y > 4.33 && y < 5.05;   // first floor: the stair head, overlapping the landing
+const stairZ = (y) => FFL + (UFL - FFL) * THREE.MathUtils.clamp((y - ST.y0) / (ST.y1 - ST.y0), 0, 1);
+// rooms upstairs: each a list of open rects (the landing and its lobby are one open area)
+const FF_ROOMS = {
+  landing: [rect(2.70, 7.60, 4.40, 6.60), rect(2.70, 3.90, 3.70, 4.40)], bed2: [rect(0.40, 3.90, 0.40, 3.60)],
+  bath: [rect(0.40, 2.60, 3.70, 6.60)], bed4: [rect(4.00, 6.50, 0.40, 4.30)], rlobby: [rect(7.95, 9.05, 3.70, 6.60)],
+  bed1: [rect(7.95, 12.00, 0.40, 3.60)], bed3: [rect(9.15, 12.00, 3.70, 6.60)],
+};
+const FF_BLOCK = [
+  rect(6.50, 7.60, 1.60, 4.65),                                                                   // stairwell + newel wall
+  rect(9.85, 12.00, 1.08, 2.92), rect(11.57, 12.00, 0.63, 1.07), rect(11.57, 12.00, 2.93, 3.37),   // bed 1 + bedsides
+  rect(7.95, 8.50, 0.55, 1.31), rect(7.95, 8.21, 1.40, 2.15), circ(8.78, 0.93, 0.28),            // desk, stone, chair
+  rect(8.08, 8.16, 2.79, 3.60), rect(9.16, 9.54, 0.40, 0.56), rect(10.46, 10.84, 0.40, 0.56),     // door leaf, curtains
+  rect(1.80, 3.90, 1.25, 2.75), rect(3.47, 3.90, 0.80, 1.24), rect(0.40, 0.88, 2.40, 3.25),       // bed 2, bedside, chest
+  rect(3.66, 3.74, 2.83, 3.60), rect(1.86, 2.24, 0.40, 0.56), rect(3.16, 3.54, 0.40, 0.56),       // door leaf, curtains
+  rect(9.95, 12.00, 4.53, 5.97), rect(11.57, 12.00, 5.98, 6.42), rect(9.15, 9.92, 3.83, 3.91),    // bed 3, bedside, leaf
+  rect(10.10, 10.46, 6.42, 6.60), rect(11.14, 11.50, 6.42, 6.60),                                 // curtains
+  rect(5.55, 6.50, 0.40, 2.43), rect(5.63, 6.47, 2.50, 2.88), rect(4.00, 4.36, 1.45, 2.25),       // bed 4, bench, shelves
+  rect(6.33, 6.41, 3.55, 4.30), rect(4.28, 4.61, 0.40, 0.56), rect(5.09, 5.42, 0.40, 0.56),       // door leaf, curtain
+  rect(0.40, 2.12, 5.86, 6.60), rect(0.40, 1.33, 3.70, 4.63), rect(1.43, 1.88, 3.70, 4.35),       // bath, shower, WC
+  rect(1.98, 2.52, 3.70, 4.15), rect(0.40, 0.52, 4.75, 5.30),                                     // basin, radiator
+  rect(2.70, 2.80, 4.07, 4.84), rect(7.95, 8.72, 6.13, 6.23),                                     // bath + lobby door leaves
+];
+// doorways: [wall runs along 'y' | 'x', u0, u1 (door width along the wall), c0, c1 (strip across the wall)]
+const DOORS0 = [
+  ['x', 5.00, 5.80, -0.45, 0.75], ['x', 5.75, 6.55, 6.25, 7.35], ['y', 5.30, 6.10, 7.20, 8.35],   // porch, back, sitting
+  ['y', -1.30, -0.40, 6.10, 7.10], ['y', 7.55, 8.35, 6.95, 8.00], ['y', 7.40, 8.20, 4.95, 5.85], // front, garden, wet
+];
+const DOORS1 = [
+  ['x', 2.95, 3.72, 3.25, 4.05], ['y', 4.80, 5.57, 2.25, 3.05], ['x', 5.62, 6.39, 3.95, 4.75],    // bed 2, bath, bed 4
+  ['y', 5.40, 6.20, 7.25, 8.30], ['x', 8.10, 8.87, 3.25, 4.05], ['y', 3.85, 4.62, 8.65, 9.55],    // lobby, bed 1, bed 3
+];
+const inDoor = (d, x, y, m) => (d[0] === 'y' ? (y > d[1] + m * 0.6 && y < d[2] - m * 0.6 && x > d[3] && x < d[4])
+  : (x > d[1] + m * 0.6 && x < d[2] - m * 0.6 && y > d[3] && y < d[4]));
+const blockedBy = (list, x, y, m) => list.some((b) => (b.r ? inC(b, x, y, m) : inR(b, x, y, m)));
+const PROBE = [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [0.7, 0.7], [-0.7, 0.7], [0.7, -0.7], [-0.7, -0.7]];
+const inArea = (rs, x, y, m) => PROBE.every(([a, b]) => rs.some((q) => inR(q, x + a * m, y + b * m)));
+const GF_ZONES = [[IN_KIT, [rect(0.40, 7.60, 0.40, 6.60)], GF_BLOCK], [IN_SIT, [rect(7.95, 12.00, 0.40, 6.60)], SIT_BLOCK],
+  [IN_PORCH, [rect(4.90, 6.40, -1.45, 0.0)], PORCH_BLOCK], [IN_RET, [rect(3.90, 7.30, 7.00, 9.60)], RET_BLOCK]];
+function walkable(level, x, y, extra = 0) {
+  const m = R + extra, e = extra;
+  if (level === 1) {
+    if (STAIR_LANE1(x, y)) return x > LANE_X0 + e && x < LANE_X1 - e;
+    if (DOORS1.some((d) => inDoor(d, x, y, m))) return true;
+    const room = Object.values(FF_ROOMS).find((rs) => rs.some((q) => inR(q, x, y)));
+    if (!room || !inArea(room, x, y, m)) return false;
+    return !blockedBy(FF_BLOCK, x, y, m);
+  }
+  if (STAIR_LANE0(x, y)) return x > LANE_X0 + e && x < LANE_X1 - e;
+  // doorways: a strip through the wall reaching well into the rooms on both sides (past the walls' clearance)
+  if (DOORS0.some((d) => inDoor(d, x, y, m))) return true;
+  const zone = GF_ZONES.find((z) => z[0](x, y));
+  if (zone) return inArea(zone[1], x, y, m) && !blockedBy(zone[2], x, y, m);
+  // outside: the yard, the gardens round the house and the patio (fenced fields beyond)
+  if (!(x > -8.0 && x < 27.3 && y > -10.6 && y < 22.1)) return false;
+  if (OUT_BLOCK_R.some((b) => inR(b, x, y, m))) return false;
+  if (OUT_BLOCK_C.some((c) => inC(c, x, y, m))) return false;
+  return !TREES_BLOCK.some((c) => inC(c, x, y, m));
+}
+
+function floorZ(level, x, y) {
+  if (level === 0 && STAIR_LANE0(x, y)) return stairZ(y);
+  if (level === 1 && STAIR_LANE1(x, y) && y < ST.y1) return stairZ(y);
+  if (level === 1) return UFL;
+  if (INSIDE(x, y)) return FFL;
+  if (x > 6.62 && x < 7.07 && y > -1.52 && y < -0.18) return FFL - 0.012;              // front door step
+  if (x > 7.57 && x < 7.97 && y > 7.38 && y < 8.52) return FFL - 0.012;                // garden door step
+  if (x > 17.7 && x < 21.9 && y > -6.1 && y < -1.7) return 0.06;                       // patio
+  return zGround(x, y);
+}
+function eyeHeight(level, x, y) {
+  if (level === 1) return 1.55;
+  if (STAIR_LANE0(x, y)) return 1.6 - 0.05 * THREE.MathUtils.clamp((y - ST.y0) / (ST.y1 - ST.y0), 0, 1);
+  return 1.6;
+}
+function zoneName(level, x, y) {
+  if ((level === 0 && STAIR_LANE0(x, y) && y > 1.45) || (level === 1 && STAIR_LANE1(x, y) && y < ST.y1)) return 'Stairs';
+  if (level === 1) {
+    const names = { landing: 'Landing', bed2: 'Bedroom 2', bath: 'Bathroom', bed4: 'Bedroom 4', rlobby: 'Landing',
+      bed1: 'Bedroom 1', bed3: 'Bedroom 3' };
+    const k = Object.keys(FF_ROOMS).find((r) => FF_ROOMS[r].some((q) => inR(q, x, y)));
+    return k ? names[k] : 'Landing';
+  }
+  if (IN_KIT(x, y)) return x > 6.3 ? 'Hall' : (y > 3.6 && x < 5.0 ? 'Kitchen' : 'Dining area');
+  if (IN_SIT(x, y)) return 'Sitting room';
+  if (IN_PORCH(x, y)) return 'Porch';
+  if (IN_RET(x, y)) return x < 5.40 ? 'Wet room' : 'Utility';
+  if (x > 17.7 && x < 23.7 && y > -6.6 && y < 0.5) return 'Patio';
+  if (y < 0.0 && x < 17.7) return 'Yard';
+  return 'Garden';
+}
+
+// level switching at the head of the stairs
+function levelAt(level, x, y) {
+  if (level === 0 && STAIR_LANE0(x, y) && y > 4.40) return 1;
+  if (level === 1 && STAIR_LANE1(x, y) && y < 4.36) return 0;
+  return level;
+}
+
+// ------------------------------------------------------------------ path finding grid (0.1 m)
+const GRID = [
+  { x0: -8.0, y0: -10.6, nx: 353, ny: 327, h: 0.1 },   // level 0 (house, yard, gardens, patio)
+  { x0: 0.0, y0: 0.0, nx: 124, ny: 70, h: 0.1 },        // level 1 (upstairs)
+];
+let cells = null;
+function buildGrid() {
+  cells = GRID.map((g, L) => {
+    const a = new Uint8Array(g.nx * g.ny);
+    for (let j = 0; j < g.ny; j++) for (let i = 0; i < g.nx; i++) {
+      a[j * g.nx + i] = walkable(L, g.x0 + (i + 0.5) * g.h, g.y0 + (j + 0.5) * g.h, 0.035) ? 1 : 0;
+    }
+    return a;
+  });
+}
+function cellOf(L, x, y) {
+  const g = GRID[L];
+  const i = Math.floor((x - g.x0) / g.h), j = Math.floor((y - g.y0) / g.h);
+  return (i < 0 || j < 0 || i >= g.nx || j >= g.ny) ? -1 : j * g.nx + i;
+}
+function findPath(L0, x0, y0, L1, x1, y1) {
+  // A* over two grid layers joined at the head of the stairs
+  const N0 = GRID[0].nx * GRID[0].ny, N1 = GRID[1].nx * GRID[1].ny, NT = N0 + N1;
+  const key = (L, c) => (L === 0 ? c : N0 + c);
+  const start = key(L0, cellOf(L0, x0, y0)), goal = key(L1, cellOf(L1, x1, y1));
+  if (start < 0 || goal < 0 || cellOf(L0, x0, y0) < 0 || cellOf(L1, x1, y1) < 0) return null;
+  const pos = (k) => { const L = k < N0 ? 0 : 1, c = L ? k - N0 : k, g = GRID[L]; return [L, g.x0 + ((c % g.nx) + 0.5) * g.h, g.y0 + (Math.floor(c / g.nx) + 0.5) * g.h]; };
+  const gx = pos(goal);
+  const hfun = (k) => { const p = pos(k); return Math.hypot(p[1] - gx[1], p[2] - gx[2]) + (p[0] !== gx[0] ? 2 : 0); };
+  const gs = new Float32Array(NT).fill(Infinity), from = new Int32Array(NT).fill(-1), closed = new Uint8Array(NT);
+  const heap = [];
+  const push = (k, f) => { heap.push([f, k]); let i = heap.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (heap[p][0] <= heap[i][0]) break; [heap[p], heap[i]] = [heap[i], heap[p]]; i = p; } };
+  const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let m = i; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === i) break; [heap[m], heap[i]] = [heap[i], heap[m]]; i = m; } } return top; };
+  gs[start] = 0; push(start, hfun(start));
+  let iter = 0;
+  while (heap.length && iter++ < 400000) {
+    const [, k] = pop();
+    if (k === goal) break;
+    if (closed[k]) continue;
+    closed[k] = 1;
+    const [L, x, y] = pos(k), g = GRID[L], c = L ? k - N0 : k, i = c % g.nx, j = Math.floor(c / g.nx);
+    for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+      if (!di && !dj) continue;
+      const ii = i + di, jj = j + dj;
+      if (ii < 0 || jj < 0 || ii >= g.nx || jj >= g.ny) continue;
+      const cc = jj * g.nx + ii;
+      if (!cells[L][cc]) continue;
+      if (di && dj && (!cells[L][j * g.nx + ii] || !cells[L][jj * g.nx + i])) continue;
+      const nk = key(L, cc), ng = gs[k] + (di && dj ? 1.4142 : 1) * g.h;
+      if (ng < gs[nk]) { gs[nk] = ng; from[nk] = k; push(nk, ng + hfun(nk)); }
+    }
+    // stair link between layers
+    if (x > LANE_X0 && x < LANE_X1 && y > 4.36 && y < 4.46) {      // stair link between the levels
+      const oL = 1 - L, oc = cellOf(oL, x, y);
+      if (oc >= 0 && cells[oL][oc]) {
+        const nk = key(oL, oc), ng = gs[k] + 0.3;
+        if (ng < gs[nk]) { gs[nk] = ng; from[nk] = k; push(nk, ng + hfun(nk)); }
+      }
+    }
+  }
+  if (from[goal] < 0 && goal !== start) return null;
+  const out = [];
+  for (let k = goal; k >= 0; k = from[k]) { out.push(pos(k)); if (k === start) break; }
+  out.reverse();
+  // string pulling on the same layer
+  const clear = (a, b) => {
+    if (a[0] !== b[0]) return false;
+    const d = Math.hypot(b[1] - a[1], b[2] - a[2]), n = Math.ceil(d / 0.05);
+    for (let s = 1; s < n; s++) { const t = s / n; if (!walkable(a[0], a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t, 0.03)) return false; }
+    return true;
+  };
+  const smooth = [out[0]];
+  let i = 0;
+  while (i < out.length - 1) {
+    let j = out.length - 1;
+    while (j > i + 1 && !clear(out[i], out[j])) j--;
+    smooth.push(out[j]); i = j;
+  }
+  return smooth;
+}
+
+// ------------------------------------------------------------------ player state
+const ROOMS = {
+  outside: { L: 0, x: -5.05, y: -8.55, look: [5.5, 2.5, 3.0] },
+  kitchen: { L: 0, x: 3.15, y: 4.15, look: [3.1, 6.6, 1.25] },
+  dining: { L: 0, x: 6.05, y: 3.95, look: [0.4, 2.6, 1.2] },
+  sitting: { L: 0, x: 10.45, y: 5.15, look: [8.2, 3.5, 0.9] },
+  wet: { L: 0, x: 4.95, y: 8.25, look: [3.9, 7.45, 1.1] },
+  bed1: { L: 1, x: 8.55, y: 3.15, look: [11.2, 2.0, 3.3] },
+  bed2: { L: 1, x: 1.25, y: 3.15, look: [3.6, 2.0, 3.3] },
+  bed3: { L: 1, x: 9.45, y: 4.35, look: [11.6, 5.3, 3.3] },
+  bed4: { L: 1, x: 5.15, y: 3.95, look: [5.5, 0.6, 3.5] },
+  bath: { L: 1, x: 2.15, y: 5.05, look: [0.8, 6.2, 3.2] },
+  patio: { L: 0, x: 18.05, y: -0.65, look: [25.0, -4.5, 1.0] },
+};
+const P = { L: 0, x: ROOMS.outside.x, y: ROOMS.outside.y, z: 1.62, yaw: 0, pitch: 0, vx: 0, vy: 0 };
+function lookAtYawPitch(L, x, y, t) {
+  const ez = floorZ(L, x, y) + eyeHeight(L, x, y);
+  return [Math.atan2(t[1] - y, t[0] - x), Math.atan2(t[2] - ez, Math.hypot(t[0] - x, t[1] - y))];
+}
+[P.yaw, P.pitch] = lookAtYawPitch(0, P.x, P.y, ROOMS.outside.look);
+let targetYaw = P.yaw, targetPitch = P.pitch;
+P.z = floorZ(0, P.x, P.y) + eyeHeight(0, P.x, P.y);
+
+let route = null;          // {pts, i, endLook}
+let dirty = 5;
+const keys = new Set();
+let lastInteraction = 0;
+
+function setRoute(pts, endLook, turn = true) {
+  route = pts && pts.length > 1 ? { pts, i: 1, endLook, stuck: 0, turn } : null;
+  if (!route && endLook) { targetYaw = endLook[0]; targetPitch = endLook[1]; }
+  dirty = 5;
+}
+function goToRoom(name) {
+  const r = ROOMS[name];
+  const path = findPath(P.L, P.x, P.y, r.L, r.x, r.y);
+  const endLook = lookAtYawPitch(r.L, r.x, r.y, r.look);
+  if (path) setRoute(path, endLook);
+  else { P.L = r.L; P.x = r.x; P.y = r.y; P.z = floorZ(r.L, r.x, r.y) + eyeHeight(r.L, r.x, r.y); targetYaw = endLook[0]; targetPitch = endLook[1]; }
+  document.querySelectorAll('.chip').forEach((c) => c.setAttribute('aria-pressed', String(c.dataset.room === name)));
+}
+
+// ------------------------------------------------------------------ input: look, move, tap-to-walk
+const stickEl = $('#stick'), stickKnob = $('#stick i'), marker = $('#marker');
+let stick = null, lookPtr = null;
+const pointers = new Map();
+function moveKnob(p) {
+  let ox = p.x - p.sx, oy = p.y - p.sy; const d = Math.hypot(ox, oy), mx = 46;
+  if (d > mx) { ox *= mx / d; oy *= mx / d; }
+  stickKnob.style.transform = `translate(${ox}px, ${oy}px)`;
+  p.ax = ox / mx; p.ay = oy / mx;
+  route = null;
+}
+canvas.addEventListener('pointerdown', (e) => {
+  canvas.focus();
+  canvas.setPointerCapture(e.pointerId);
+  lastInteraction = performance.now();
+  hideHint();
+  const info = { id: e.pointerId, sx: e.clientX, sy: e.clientY, x: e.clientX, y: e.clientY, t: performance.now(), moved: false, type: e.pointerType };
+  if (e.pointerType === 'touch') document.documentElement.classList.add('touch');   // touch laptops too
+  if (e.pointerType === 'touch' && !stick) {
+    const r = stickEl.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    if (r.width && Math.hypot(e.clientX - cx, e.clientY - cy) < r.width / 2 + 18) {
+      stick = info; info.stick = true; info.sx = cx; info.sy = cy;
+      moveKnob(info);
+    }
+  }
+  pointers.set(e.pointerId, info);
+});
+canvas.addEventListener('pointermove', (e) => {
+  const p = pointers.get(e.pointerId);
+  if (!p) return;
+  const dx = e.clientX - p.x, dy = e.clientY - p.y;
+  p.x = e.clientX; p.y = e.clientY;
+  if (Math.hypot(p.x - p.sx, p.y - p.sy) > 6) p.moved = true;
+  if (p.stick) {
+    moveKnob(p);
+  } else if (p.moved) {
+    const k = (p.type === 'touch' ? 0.0042 : 0.0034) * (70 / Math.max(40, camera.fov)) ;
+    // drag right = look right, drag up = look up (the user's choice, 3 Oct 2026 -- not Street View's
+    // "grab the scene")
+    targetYaw -= dx * k;
+    targetPitch = THREE.MathUtils.clamp(targetPitch - dy * k, -1.2, 1.2);
+    if (route && route.endLook) route.endLook = null;
+  }
+  dirty = 3;
+});
+function endPointer(e) {
+  const p = pointers.get(e.pointerId);
+  if (!p) return;
+  pointers.delete(e.pointerId);
+  if (p.stick) { stick = null; stickKnob.style.transform = 'translate(0,0)'; return; }
+  if (!p.moved && performance.now() - p.t < 450) tapToWalk(e.clientX, e.clientY);
+}
+canvas.addEventListener('pointerup', endPointer);
+canvas.addEventListener('pointercancel', endPointer);
+canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+addEventListener('keydown', (e) => {
+  if (e.target.closest && e.target.closest('button') && (e.key === ' ' || e.key === 'Enter')) return;
+  const k = e.key.toLowerCase();
+  if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'shift', 'q', 'e'].includes(k)) {
+    keys.add(k); route = null; hideHint(); dirty = 3;
+    if (k.startsWith('arrow')) e.preventDefault();
+  }
+});
+addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
+addEventListener('blur', () => keys.clear());
+
+const raycaster = new THREE.Raycaster();
+let pickables = [];
+function tapToWalk(cx, cy) {
+  if (!cells) return;
+  const ndc = new THREE.Vector2((cx / innerWidth) * 2 - 1, -(cy / innerHeight) * 2 + 1);
+  raycaster.setFromCamera(ndc, camera);
+  const hit = raycaster.intersectObjects(pickables, false)[0];
+  if (!hit || !hit.face) return;
+  const n = hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
+  let bx = hit.point.x, by = -hit.point.z, bz = hit.point.y;
+  if (n.y < 0.6) {       // clicked a wall or furniture: walk to the floor just in front of it
+    const back = raycaster.ray.direction.clone().multiplyScalar(-0.35);
+    bx += back.x; by -= back.z; bz = Math.min(bz, P.z - 1.0);
+  }
+  const L = bz > 2.4 ? 1 : 0;
+  let tx = bx, ty = by;
+  if (!walkable(L, tx, ty)) {
+    let best = null;
+    for (let r = 0.1; r <= 0.8 && !best; r += 0.1) for (let a = 0; a < 16; a++) {
+      const x = bx + Math.cos(a * Math.PI / 8) * r, y = by + Math.sin(a * Math.PI / 8) * r;
+      if (walkable(L, x, y)) { best = [x, y]; break; }
+    }
+    if (!best) return;
+    [tx, ty] = best;
+  }
+  const path = findPath(P.L, P.x, P.y, L, tx, ty);
+  if (!path) return;
+  setRoute(path, null, path.length > 2 || path.some((p) => p[0] !== L));   // straight glides keep the current view
+  const v = B(tx, ty, floorZ(L, tx, ty) + 0.01).project(camera);
+  marker.style.left = ((v.x + 1) / 2 * innerWidth) + 'px';
+  marker.style.top = ((1 - v.y) / 2 * innerHeight) + 'px';
+  marker.style.opacity = 1;
+  setTimeout(() => { marker.style.opacity = 0; }, 450);
+  document.querySelectorAll('.chip').forEach((c) => c.setAttribute('aria-pressed', 'false'));
+}
+
+// ------------------------------------------------------------------ UI wiring
+document.querySelectorAll('.chip').forEach((c) => c.addEventListener('click', () => { hideHint(); goToRoom(c.dataset.room); }));
+// Eye: hide the panels for a clear view of the place (the Outside chip still goes back to the start).
+// The eye itself stays put -- the map fades rather than collapsing, so the button does not move.
+const clearBtn = $('#clear');
+const EYE_ON = '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>';
+const EYE_OFF = '<path d="M3 3l18 18"/><path d="M10.6 5.1A10.4 10.4 0 0 1 12 5c6.4 0 10 7 10 7a17.5 17.5 0 0 1-3.2 4.1M6.6 6.6A16.8 16.8 0 0 0 2 12s3.6 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>';
+clearBtn.addEventListener('click', () => {
+  const clear = document.body.classList.toggle('clear-view');
+  clearBtn.querySelector('svg').innerHTML = clear ? EYE_OFF : EYE_ON;
+  const label = clear ? 'Show the panels' : 'Hide the panels';
+  clearBtn.setAttribute('aria-label', label); clearBtn.title = label;
+  if (clear) hideHint();
+});
+const fsBtn = $('#fs');
+if (!document.fullscreenEnabled) fsBtn.hidden = true;
+fsBtn.addEventListener('click', () => {
+  const d = document;
+  (d.fullscreenElement ? d.exitFullscreen() : d.documentElement.requestFullscreen()).catch(() => { fsBtn.hidden = true; });
+});
+const hintEl = $('#hint');
+hintEl.innerHTML = COARSE
+  ? '<b>Drag</b> to look &middot; <b>joystick</b> to move &middot; <b>tap the floor</b> to walk there'
+  : '<b>Drag</b> to look &middot; <b>WASD</b> or arrows to move &middot; <b>click the floor</b> to walk there';
+let hintHidden = false;
+function hideHint() { if (!hintHidden) { hintHidden = true; setTimeout(() => hintEl.classList.add('gone'), 2500); } }
+const whereEl = $('#where');
+
+// ------------------------------------------------------------------ minimap: top-down "drone" view + floor plan
+const MAPS = {
+  grounds: { cx: 9.0, cy: 5.0, size: 42, zCut: 0, adapt: 0, label: 'Grounds', L: 0, scale: 10 },
+  GF: { cx: 4.2, cy: 3.8, size: 17.0, zCut: 2.25, adapt: 1, label: 'Ground floor', L: 0, scale: 2 },
+  FF: { cx: 6.2, cy: 3.5, size: 13.5, zCut: 4.45, adapt: 1, label: 'First floor', L: 1, scale: 2 },
+};
+const W = (x0, y0, x1, y1) => [x0, y0, x1, y1];
+const PLAN = {
+  GF: {
+    walls: [W(0.0, 0.0, 5.00, 0.4), W(5.80, 0.0, 12.4, 0.4), W(0.0, 6.6, 5.75, 7.0), W(6.55, 6.6, 12.4, 7.0),
+      W(0.0, 0.0, 0.4, 7.0), W(12.0, 0.0, 12.4, 7.0), W(7.60, 0.4, 7.95, 5.30), W(7.60, 6.10, 7.95, 6.6),
+      W(4.65, -1.7, 6.65, -1.45), W(4.65, -1.45, 4.90, 0.0), W(6.40, -1.45, 6.65, -1.30), W(6.40, -0.40, 6.65, 0.0),
+      W(3.6, 9.6, 7.6, 9.9), W(3.6, 7.0, 3.9, 9.6), W(7.3, 7.0, 7.6, 7.55), W(7.3, 8.35, 7.6, 9.6),
+      W(5.35, 7.0, 5.45, 7.40), W(5.35, 8.20, 5.45, 9.6)],
+    solid: [W(-7.2, 0.3, 0.0, 6.3), W(0.4, 2.4, 1.0, 4.6), W(7.95, 2.7, 8.37, 4.3)],
+    windows: [[2.20, 0.2, 3.20, 0.2], [9.50, 0.2, 10.50, 0.2], [2.65, 6.8, 3.55, 6.8], [9.50, 6.8, 10.50, 6.8],
+      [5.35, -1.575, 5.95, -1.575], [6.00, 9.75, 6.90, 9.75], [3.75, 8.40, 3.75, 9.00]],
+    stairs: { x0: 6.60, x1: 7.60, y0: 1.40, y1: 4.65, dir: 'up' },
+    labels: [['Kitchen', 2.9, 5.2], ['Dining', 3.1, 1.0], ['Sitting room', 10.0, 1.0], ['Porch', 5.65, -0.8],
+      ['Utility', 6.4, 8.2], ['Wet room', 4.6, 9.0], ['Cottage', -3.6, 3.3]],
+  },
+  FF: {
+    walls: [W(0.0, 0.0, 12.4, 0.4), W(0.0, 6.6, 12.4, 7.0), W(0.0, 0.0, 0.4, 7.0), W(12.0, 0.0, 12.4, 7.0),
+      W(3.90, 0.4, 4.00, 4.40), W(6.50, 0.4, 6.60, 4.65), W(0.4, 3.60, 2.95, 3.70), W(3.72, 3.60, 3.90, 3.70),
+      W(4.00, 4.30, 5.62, 4.40), W(6.39, 4.30, 6.50, 4.40), W(2.60, 3.70, 2.70, 4.80), W(2.60, 5.57, 2.70, 6.60),
+      W(6.60, 1.60, 7.60, 1.68), W(7.60, 0.4, 7.95, 5.40), W(7.60, 6.20, 7.95, 6.6), W(7.95, 3.60, 8.10, 3.70),
+      W(8.87, 3.60, 12.0, 3.70), W(9.05, 3.70, 9.15, 3.85), W(9.05, 4.62, 9.15, 6.6)],
+    solid: [W(6.60, 0.4, 7.60, 1.60)],
+    windows: [[2.20, 0.2, 3.20, 0.2], [4.55, 0.2, 5.15, 0.2], [9.50, 0.2, 10.50, 0.2], [1.10, 6.8, 1.80, 6.8],
+      [5.00, 6.8, 5.50, 6.8], [10.40, 6.8, 11.20, 6.8]],
+    void: W(6.60, 1.68, 7.60, 4.65),
+    stairs: { x0: 6.60, x1: 7.60, y0: 1.68, y1: 4.65, dir: 'down' },
+    labels: [['Bedroom 2', 1.6, 3.3], ['Bathroom', 1.5, 5.3], ['Bedroom 4', 5.2, 3.6], ['Landing', 5.0, 5.6],
+      ['Bedroom 1', 10.0, 3.3], ['Bedroom 3', 10.6, 6.2]],
+  },
+  grounds: {
+    labels: [['House', 6.8, 3.5], ['Cottage', -5.0, 3.3], ['Yard', 4.0, -6.0], ['Patio', 19.8, -5.4],
+      ['Shed', 16.6, 5.1], ['Gate', -7.7, -2.5], ['Garden', 8.0, 15.0]],
+  },
+};
+const mapEl = $('#map'), mapCanvas = $('#mapc'), mapCtx = mapCanvas.getContext('2d'), mapLvl = $('#maplvl');
+const mapImages = {};
+let mapOverride = null, lastAutoView = null, mapTarget = null, mapDirty = true, treeData = null;
+
+function autoView() {
+  if (P.L === 1) return 'FF';
+  if (P.x > -0.6 && P.x < 13.0 && P.y > -2.2 && P.y < 10.2) return 'GF';
+  return 'grounds';
+}
+function mapSizePx() {
+  const css = mapCanvas.clientWidth || 200;
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  const px = Math.round(css * dpr);
+  if (mapCanvas.width !== px) { mapCanvas.width = mapCanvas.height = px; }
+  return px;
+}
+const toMap = (v, x, y, S) => { const c = MAPS[v]; return [(x - (c.cx - c.size / 2)) / c.size * S, (1 - (y - (c.cy - c.size / 2)) / c.size) * S]; };
+const fromMap = (v, u, w, S) => { const c = MAPS[v]; return [c.cx - c.size / 2 + (u / S) * c.size, c.cy - c.size / 2 + (1 - w / S) * c.size]; };
+
+// render the three top-down images once all lighting textures are in
+function renderMapImages() {
+  const res = MOBILE ? 640 : 1024;
+  const saved = adapt;
+  for (const m of treeMeshes) m.visible = false;
+  if (grass) grass.visible = false;
+  for (const [v, cfg] of Object.entries(MAPS)) {
+    const cam = new THREE.OrthographicCamera(-cfg.size / 2, cfg.size / 2, cfg.size / 2, -cfg.size / 2, 1, 300);
+    cam.up.set(0, 0, -1);
+    cam.position.copy(B(cfg.cx, cfg.cy, 120));
+    cam.lookAt(B(cfg.cx, cfg.cy, 0));
+    const rt = new THREE.WebGLRenderTarget(res, res);
+    rt.texture.colorSpace = THREE.SRGBColorSpace;
+    adapt = cfg.adapt; applyAdaptation();
+    renderer.clippingPlanes = cfg.zCut ? [new THREE.Plane(new THREE.Vector3(0, -1, 0), cfg.zCut)] : [];
+    renderer.setRenderTarget(rt);
+    renderer.render(scene, cam);
+    renderer.setRenderTarget(null);
+    renderer.clippingPlanes = [];
+    const px = new Uint8Array(res * res * 4);
+    renderer.readRenderTargetPixels(rt, 0, 0, res, res, px);
+    rt.dispose();
+    const c = document.createElement('canvas');
+    c.width = c.height = res;
+    const g = c.getContext('2d'), img = g.createImageData(res, res);
+    for (let y = 0; y < res; y++) img.data.set(px.subarray((res - 1 - y) * res * 4, (res - y) * res * 4), y * res * 4);
+    g.putImageData(img, 0, 0);
+    mapImages[v] = c;
+  }
+  for (const m of treeMeshes) m.visible = true;
+  adapt = saved; applyAdaptation();
+  mapDirty = true; dirty = 3;
+}
+
+function drawMap() {
+  const S = mapSizePx();
+  const auto = autoView();
+  if (auto !== lastAutoView) { lastAutoView = auto; mapOverride = null; }
+  const v = mapOverride || auto, cfg = MAPS[v], plan = PLAN[v], k = S / cfg.size;
+  mapLvl.textContent = cfg.label;
+  const g = mapCtx;
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.fillStyle = '#10171a'; g.fillRect(0, 0, S, S);
+  if (mapImages[v]) { g.imageSmoothingQuality = 'high'; g.drawImage(mapImages[v], 0, 0, S, S); }
+  g.fillStyle = 'rgba(12, 17, 19, 0.16)'; g.fillRect(0, 0, S, S);
+  const R2 = (r) => { const [a, b] = toMap(v, r[0], r[3], S), [c, d] = toMap(v, r[2], r[1], S); return [a, b, c - a, d - b]; };
+  // tree canopies on the grounds view
+  if (v === 'grounds' && treeData) {
+    for (const t of treeData.trees) {
+      const card = treeData.cards[t.v]; if (!card) continue;
+      const [u, w] = toMap(v, t.x, t.y, S), r = card.size * 0.34 * t.s * k;
+      if (u < -r || w < -r || u > S + r || w > S + r) continue;
+      g.fillStyle = 'rgba(0,0,0,0.28)'; g.beginPath(); g.arc(u + r * 0.35, w + r * 0.25, r, 0, 7); g.fill();
+      const gr = g.createRadialGradient(u - r * 0.3, w - r * 0.35, r * 0.1, u, w, r);
+      const lab = false, con = t.v === 'Conifer';
+      gr.addColorStop(0, lab ? '#c9c64c' : con ? '#3f6d2a' : '#5f9a3a'); gr.addColorStop(1, lab ? '#6f7a22' : con ? '#1f3d17' : '#28511c');
+      g.fillStyle = gr; g.beginPath(); g.arc(u, w, r, 0, 7); g.fill();
+    }
+  }
+  if (plan.void) { const r = R2(plan.void); g.fillStyle = 'rgba(8,10,12,0.55)'; g.fillRect(...r); }
+  if (plan.solid) { g.fillStyle = 'rgba(28,33,35,0.72)'; for (const w of plan.solid) g.fillRect(...R2(w)); }
+  if (plan.stairs) {
+    const st = plan.stairs; g.strokeStyle = 'rgba(243,241,234,0.55)'; g.lineWidth = Math.max(1, S / 260);
+    for (let y = st.y0; y <= st.y1 + 1e-3; y += 0.24) {
+      const [a, b] = toMap(v, st.x0, y, S), [c] = toMap(v, st.x1, y, S);
+      g.beginPath(); g.moveTo(a, b); g.lineTo(c, b); g.stroke();
+    }
+    const xm = (st.x0 + st.x1) / 2, [ua, wa] = toMap(v, xm, st.y0 + 0.3, S), [ub, wb] = toMap(v, xm, st.y1 - 0.3, S);
+    const [fx, fy, tx, ty] = st.dir === 'up' ? [ua, wa, ub, wb] : [ub, wb, ua, wa];
+    g.strokeStyle = '#f1c27d'; g.lineWidth = Math.max(1.5, S / 150);
+    g.beginPath(); g.moveTo(fx, fy); g.lineTo(tx, ty); g.stroke();
+    const hd = Math.max(4, S / 45), dirv = Math.sign(ty - fy);
+    g.beginPath(); g.moveTo(tx - hd * 0.7, ty - dirv * hd); g.lineTo(tx, ty); g.lineTo(tx + hd * 0.7, ty - dirv * hd); g.stroke();
+  }
+  if (plan.walls) {
+    g.fillStyle = '#161b1d';
+    for (const w of plan.walls) { const r = R2(w); g.fillRect(r[0], r[1], r[2], r[3]); }
+    g.strokeStyle = 'rgba(243,241,234,0.35)'; g.lineWidth = 1;
+    for (const w of plan.walls) { const r = R2(w); g.strokeRect(r[0] + 0.5, r[1] + 0.5, r[2] - 1, r[3] - 1); }
+  }
+  if (plan.windows) {
+    g.strokeStyle = '#9fd3ff'; g.lineWidth = Math.max(1.5, S / 140);
+    for (const [a0, b0, a1, b1] of plan.windows) {
+      const [u0, w0] = toMap(v, a0, b0, S), [u1, w1] = toMap(v, a1, b1, S);
+      g.beginPath(); g.moveTo(u0, w0); g.lineTo(u1, w1); g.stroke();
+    }
+  }
+  // labels
+  const fs = Math.max(9, Math.min(13, S / 17));
+  g.font = `600 ${fs}px Figtree, system-ui, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.lineJoin = 'round'; g.lineWidth = 3; g.strokeStyle = 'rgba(10,14,16,0.85)'; g.fillStyle = '#f3f1ea';
+  for (const [t, x, y] of plan.labels || []) {
+    const [u, w] = toMap(v, x, y, S);
+    if (S < 200 && t.length > 9 && v !== 'grounds') continue;
+    g.strokeText(t, u, w); g.fillText(t, u, w);
+  }
+  // route line + destination
+  const sameFloor = (L) => (v === 'FF') === (L === 1);
+  if (route) {
+    g.strokeStyle = 'rgba(241,194,125,0.9)'; g.lineWidth = Math.max(1.5, S / 150); g.setLineDash([S / 60, S / 80]);
+    g.beginPath();
+    const [pu, pw] = toMap(v, P.x, P.y, S); g.moveTo(pu, pw);
+    for (let i = route.i; i < route.pts.length; i++) {
+      const q = route.pts[i]; if (!sameFloor(q[0]) && v !== 'grounds') continue;
+      const [u, w] = toMap(v, q[1], q[2], S); g.lineTo(u, w);
+    }
+    g.stroke(); g.setLineDash([]);
+  }
+  if (mapTarget && route && (v === 'grounds' || sameFloor(mapTarget.L))) {
+    const [u, w] = toMap(v, mapTarget.x, mapTarget.y, S);
+    g.strokeStyle = '#f1c27d'; g.lineWidth = 2; g.beginPath(); g.arc(u, w, Math.max(5, S / 30), 0, 7); g.stroke();
+  }
+  // you are here: view cone + dot (dimmed when showing another floor)
+  const onThis = v === 'grounds' ? P.L === 0 : sameFloor(P.L);
+  let [u, w] = toMap(v, P.x, P.y, S);
+  const edge = 8; const clamped = u < edge || w < edge || u > S - edge || w > S - edge;
+  u = Math.min(S - edge, Math.max(edge, u)); w = Math.min(S - edge, Math.max(edge, w));
+  const hfov = 2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * camera.aspect);
+  const cr = (v === 'grounds' ? 7 : 2.2) * k, ang = -P.yaw;
+  g.globalAlpha = onThis ? 1 : 0.35;
+  const cg = g.createRadialGradient(u, w, 0, u, w, cr);
+  cg.addColorStop(0, 'rgba(241,194,125,0.55)'); cg.addColorStop(1, 'rgba(241,194,125,0)');
+  g.fillStyle = cg; g.beginPath(); g.moveTo(u, w); g.arc(u, w, cr, ang - hfov / 2, ang + hfov / 2); g.closePath(); g.fill();
+  const dr = Math.max(4, S / 36);
+  g.fillStyle = clamped ? '#f1c27d' : '#c9873b'; g.strokeStyle = '#fff'; g.lineWidth = Math.max(1.5, S / 110);
+  g.beginPath(); g.arc(u, w, dr, 0, 7); g.fill(); g.stroke();
+  g.globalAlpha = 1;
+  // scale bar
+  const sb = cfg.scale * k, x0 = S * 0.06, y0 = S * 0.94;
+  g.strokeStyle = '#f3f1ea'; g.lineWidth = Math.max(1.5, S / 160);
+  g.beginPath(); g.moveTo(x0, y0 - 4); g.lineTo(x0, y0); g.lineTo(x0 + sb, y0); g.lineTo(x0 + sb, y0 - 4); g.stroke();
+  g.font = `600 ${Math.max(9, fs - 1)}px Figtree, system-ui, sans-serif`; g.textAlign = 'left'; g.textBaseline = 'bottom';
+  g.strokeStyle = 'rgba(10,14,16,0.85)'; g.lineWidth = 3;
+  g.strokeText(`${cfg.scale} m`, x0 + sb + 5, y0 + 3); g.fillText(`${cfg.scale} m`, x0 + sb + 5, y0 + 3);
+  mapDirty = false;
+}
+
+// tap the map to walk there (works across floors)
+let mapPtr = null;
+mapCanvas.addEventListener('pointerdown', (e) => { mapPtr = { x: e.clientX, y: e.clientY }; hideHint(); e.stopPropagation(); });
+mapCanvas.addEventListener('pointerup', (e) => {
+  if (!mapPtr || Math.hypot(e.clientX - mapPtr.x, e.clientY - mapPtr.y) > 8 || !cells) { mapPtr = null; return; }
+  mapPtr = null;
+  const rect = mapCanvas.getBoundingClientRect(), S = mapCanvas.width;
+  const u = (e.clientX - rect.left) / rect.width * S, w = (e.clientY - rect.top) / rect.height * S;
+  const v = mapOverride || autoView();
+  const [bx, by] = fromMap(v, u, w, S), L = MAPS[v].L;
+  let tgt = walkable(L, bx, by) ? [bx, by] : null;
+  for (let r = 0.1; r <= 1.2 && !tgt; r += 0.1) for (let a = 0; a < 16; a++) {
+    const x = bx + Math.cos(a * Math.PI / 8) * r, y = by + Math.sin(a * Math.PI / 8) * r;
+    if (walkable(L, x, y)) { tgt = [x, y]; break; }
+  }
+  if (!tgt) return;
+  const path = findPath(P.L, P.x, P.y, L, tgt[0], tgt[1]);
+  if (!path) return;
+  setRoute(path, null, true);
+  mapTarget = { x: tgt[0], y: tgt[1], L };
+  document.querySelectorAll('.chip').forEach((c) => c.setAttribute('aria-pressed', 'false'));
+  mapDirty = true;
+});
+$('#mapfloor').addEventListener('click', () => {
+  // from a floor, show the other floor first, then the grounds, then back to where you are
+  const auto = autoView();
+  const seq = (auto === 'FF' ? ['FF', 'GF', 'grounds'] : auto === 'GF' ? ['GF', 'FF', 'grounds'] : ['grounds', 'GF', 'FF'])
+    .filter((v) => MAPS[v]);
+  const cur = mapOverride || auto;
+  mapOverride = seq[(seq.indexOf(cur) + 1) % seq.length];
+  if (mapOverride === auto) mapOverride = null;
+  mapDirty = true;
+});
+$('#mapbig').addEventListener('click', (e) => {
+  const big = mapEl.classList.toggle('big');
+  e.currentTarget.setAttribute('aria-pressed', String(big));
+  e.currentTarget.setAttribute('aria-label', big ? 'Shrink map' : 'Enlarge map');
+  setTimeout(() => { mapDirty = true; }, 280);
+  mapDirty = true;
+});
+addEventListener('resize', () => { mapDirty = true; });
+
+// ------------------------------------------------------------------ light adaptation (inside / outside)
+let adapt = 0;   // 0 = eyes adjusted to outdoors, 1 = indoors
+const white = new THREE.Color(1, 1, 1);
+function applyAdaptation() {
+  const lift = 1 + (INT_GAIN - 1) * adapt;             // indoors everything is exposed brighter, views out included
+  const extK = (1 + 0.45 * adapt) * lift, intK = (0.62 + 0.38 * adapt) * lift;
+  for (const g of GROUPS) {
+    const k = INTERIOR.has(g) ? intK : extK;
+    for (const m of groupMats[g]) if (m.emissiveMap) { m.emissiveIntensity = k; m.envMapIntensity = k * (m.userData.floorTile ? FLOOR_REFL : 1); }
+  }
+  for (const m of treeMats) m.color.setScalar(extK);
+  if (bloomPass) bloomPass.threshold = 0.88 * lift;   // the lift brightens rooms, not the glow round lamps and windows
+  if (farGround) farGround.material.color.copy(lawnColor).multiplyScalar(extK);
+  scene.backgroundIntensity = extK;
+  if (scene.fog) scene.fog.color.copy(fogBase).multiplyScalar(extK);
+  if (grass) grass.material.uniforms.uK.value = extK;
+}
+
+// ------------------------------------------------------------------ world assembly
+const treeMats = [];
+const treeMeshes = [];
+let farGround = null;
+const fogBase = new THREE.Color(0xb8c4cc);
+const lawnColor = new THREE.Color(0x4f7a2c);
+
+// the model ships as base64 glTF-binary inside JSON; meshopt-compressed first, plain quantized as a fallback
+async function loadModel(gltfLoader) {
+  const parse = async (urls) => {
+    const js = await Promise.all(urls.map((u) => fetch(u).then((r) => { if (!r.ok) throw new Error(u + ' ' + r.status); return r.json(); })));
+    const s = atob(js.map((j) => j.data).join('')), buf = new Uint8Array(s.length);
+    for (let i = 0; i < s.length; i++) buf[i] = s.charCodeAt(i);
+    return gltfLoader.parseAsync(buf.buffer, '');
+  };
+  try { return await parse(['assets/lodge.json' + VER]); }
+  catch (e) { console.warn('compressed model failed, using fallback', e); return parse(['assets/lodge_q0.json' + VER, 'assets/lodge_q1.json' + VER]); }
+}
+
+async function start() {
+  resize();
+  const gltfLoader = new GLTFLoader();
+  gltfLoader.setMeshoptDecoder(MeshoptDecoder);
+  const texList = GROUPS.map((g) => `assets/tex/${g}_${Q}.webp`);
+  totalCount = 3 + texList.length + 6 + 1 + 16;
+  statusEl.textContent = 'Loading the house...';
+
+  const [gltf, meta] = await Promise.all([
+    loadModel(gltfLoader).then((r) => { progress('Model loaded'); return r; }),
+    fetch('assets/trees.json' + VER).then((r) => r.json()).then((j) => { progress('Garden layout loaded'); return j; }),
+  ]);
+  if (meta.lawn) lawnColor.setRGB(...meta.lawn, THREE.SRGBColorSpace);
+  TREES_BLOCK = meta.trees.map((t) => circ(t.x, t.y, 0.35 * t.s + 0.1));
+  treeData = meta;
+
+  const matCache = new Map();
+  gltf.scene.traverse((o) => {
+    if (!o.isMesh) return;
+    const src = Array.isArray(o.material) ? o.material : [o.material];
+    const mapped = src.map((m) => { if (!matCache.has(m.name)) matCache.set(m.name, webMaterial(m.name)); return matCache.get(m.name); });
+    o.material = Array.isArray(o.material) ? mapped : mapped[0];
+    o.matrixAutoUpdate = false; o.updateMatrix();
+    const names = src.map((m) => m.name).join(',');
+    if (!names.startsWith('GLASS') && !names.startsWith('MIRROR')) pickables.push(o);
+    if (names.startsWith('GLASS')) o.renderOrder = 2;
+  });
+  scene.add(gltf.scene);
+
+  // far lawn beyond the baked grounds
+  // (no flat far-lawn disc here: the land falls away to the bay; the backdrop panorama carries the far view)
+
+  // textures: outside first, then the ground floor, then the rest
+  const setGroupTex = (g, t) => {
+    for (const m of groupMats[g]) {
+      m.emissiveMap = t;
+      const wb = ZONE_WB[g] || INT_WB;
+      if (INTERIOR.has(g)) m.emissive.setRGB(wb[0], wb[1], wb[2]); else m.emissive.setScalar(1);
+      m.needsUpdate = true;
+    }
+    dirty = 5;
+  };
+  const panoP = loadTex(`assets/tex/pano_${Q}.webp${VER}`, { flip: true }).then((t) => {
+    try {   // aerial haze takes the colour of the sky just above the horizon in the backdrop
+      const c = document.createElement('canvas'); c.width = 64; c.height = 32;
+      const g2 = c.getContext('2d'); g2.drawImage(t.image, 0, 0, 64, 32);
+      const d = g2.getImageData(0, 13, 64, 3).data; let r = 0, gg = 0, b = 0;
+      for (let i = 0; i < d.length; i += 4) { r += d[i]; gg += d[i + 1]; b += d[i + 2]; }
+      const n = d.length / 4; fogBase.setRGB(r / n / 255, gg / n / 255, b / n / 255, THREE.SRGBColorSpace);
+    } catch (e) { /* keep default haze */ }
+    scene.fog = new THREE.Fog(fogBase.clone(), 70, 1300);
+    t.mapping = THREE.EquirectangularReflectionMapping; scene.background = t; progress('Sky and mountains'); dirty = 5;
+  });
+  let shown = false;
+  const reveal = () => { if (!shown) { shown = true; buildGrid(); $('#loader').classList.add('done'); dirty = 5; } };
+  const loadGroup = (g) => loadTex(`assets/tex/${g}_${Q}.webp${VER}`).then((t) => { setGroupTex(g, t); progress(`Lighting: ${g}`); });
+
+  await Promise.all([loadGroup('EXT'), loadGroup('SITEN'), panoP]);
+  applyAdaptation();
+  // the house is viewable now, but trees, grass, reflections and indoor lighting would pop in while people
+  // look -- keep the loading screen up until all of it is in, at most 10 s longer so a slow phone still gets in
+  const holdCap = setTimeout(reveal, 10000);
+  const rest = ['GF', 'BATH', 'FF', 'SITEF', 'HOUSE'].reduce((p, g) => p.then(() => loadGroup(g)), Promise.resolve());
+  const treesP = Promise.all([buildTrees(meta), buildLeaves()]);
+  await Promise.all([rest, treesP]);
+  bakeProbes();
+  setupMirrors(gltf.scene);
+  buildGrass();
+  // photo-scanned detail maps: normal (RG) + fine albedo (B), tiled on the second UV set
+  await Promise.all([...detailUsers.keys()].map((tex) => loadTex(`assets/tex/det_${tex}_${Q}.webp${VER}`, { srgb: false, repeat: true })
+    .then((t) => { applyDetail(tex, t); progress('Surface detail'); dirty = 3; })
+    .catch((e) => console.warn('detail map', tex, e))));
+  applyAdaptation();
+  renderMapImages();
+  fpsAcc = 0; fpsN = 0;                    // judge the speed on walking, not on the loading stalls
+  statusEl.textContent = 'Ready';
+  barEl.style.width = '100%';
+  clearTimeout(holdCap);
+  reveal();
+}
+
+// ------------------------------------------------------------------ leaf cards on the bushes (scripts/web/foliage_cards.py)
+// The bushes bake as solid foliage masses; at web lightmap resolution they read as smooth blobs. A shell of small
+// alpha-tested leaf sprites, each coloured from the baked lightmap where it stands, makes them read as leaves.
+function leafTexture() {
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const g = c.getContext('2d');
+  let seed = 7;
+  const rnd = (a, b) => { seed = (seed * 16807) % 2147483647; return a + (seed / 2147483647) * (b - a); };
+  for (let i = 0; i < 10; i++) {
+    const x = rnd(28, 100), y = rnd(28, 100), a = rnd(0, Math.PI), l = rnd(15, 27), w = l * rnd(0.32, 0.5);
+    const v = Math.round(rnd(185, 255));
+    g.save(); g.translate(x, y); g.rotate(a);
+    g.fillStyle = `rgb(${v},${v},${v})`;
+    g.beginPath(); g.ellipse(0, 0, l, w, 0, 0, Math.PI * 2); g.fill();
+    g.restore();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  return t;
+}
+function ivyTexture() {
+  // three-lobed ivy leaves (heart base, pointed lobes), a few per card, grey-shaded so the baked colour carries the hue
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const g = c.getContext('2d');
+  let seed = 19;
+  const rnd = (a, b) => { seed = (seed * 16807) % 2147483647; return a + (seed / 2147483647) * (b - a); };
+  for (let i = 0; i < 5; i++) {
+    const x = rnd(34, 94), y = rnd(34, 94), a = rnd(0, Math.PI * 2), r = rnd(15, 24);
+    const v = Math.round(rnd(175, 255));
+    g.save(); g.translate(x, y); g.rotate(a);
+    g.fillStyle = `rgb(${v},${v},${v})`;
+    g.beginPath();
+    g.moveTo(0, r * 0.45);                                   // stalk end
+    g.quadraticCurveTo(-r * 0.9, r * 0.5, -r, -r * 0.05);   // left lobe
+    g.lineTo(-r * 0.45, -r * 0.2);
+    g.quadraticCurveTo(-r * 0.35, -r * 0.8, 0, -r * 1.05);   // tip
+    g.quadraticCurveTo(r * 0.35, -r * 0.8, r * 0.45, -r * 0.2);
+    g.lineTo(r, -r * 0.05);                                  // right lobe
+    g.quadraticCurveTo(r * 0.9, r * 0.5, 0, r * 0.45);
+    g.fill();
+    g.strokeStyle = `rgb(${v - 45},${v - 45},${v - 45})`;    // midrib
+    g.lineWidth = 1.2;
+    g.beginPath(); g.moveTo(0, r * 0.4); g.lineTo(0, -r * 0.8); g.stroke();
+    g.restore();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  return t;
+}
+async function buildLeaves() {
+  let js;
+  try { js = await fetch('assets/foliage.json' + VER).then((r) => r.json()); } catch (e) { return; }
+  const d = js.data, S = js.stride, n = d.length / S;
+  const kinds = { bush: { tex: leafTexture(), list: [], size: [0.13, 0.10], off: 0.035, tilt: 1.1 },
+    ivy: { tex: ivyTexture(), list: [], size: [0.11, 0.08], off: 0.03, tilt: 0.55 } };
+  for (let i = 0; i < n; i++) (d[i * S + 9] === 6 ? kinds.ivy : kinds.bush).list.push(i);
+  let seed = 11;
+  const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), q2 = new THREE.Quaternion();
+  const s = new THREE.Vector3(), p = new THREE.Vector3(), nrm = new THREE.Vector3(), zAxis = new THREE.Vector3(0, 0, 1);
+  const col = new THREE.Color(), SHEEN = new THREE.Color(0.006, 0.010, 0.016);
+  for (const k of Object.values(kinds)) {
+    if (!k.list.length) continue;
+    const mat = new THREE.MeshBasicMaterial({ map: k.tex, alphaTest: 0.5, side: THREE.DoubleSide, alphaToCoverage: !MOBILE });
+    treeMats.push(mat);
+    const im = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), mat, k.list.length);
+    k.list.forEach((i, j) => {
+      const o = i * S;
+      nrm.copy(B(d[o + 3], d[o + 4], d[o + 5]));
+      nrm.x += (rnd() - 0.5) * k.tilt; nrm.y += (rnd() - 0.5) * k.tilt; nrm.z += (rnd() - 0.5) * k.tilt;   // off the surface
+      nrm.normalize();
+      q.setFromUnitVectors(zAxis, nrm);
+      q2.setFromAxisAngle(nrm, rnd() * Math.PI * 2);
+      q.premultiply(q2);
+      const sz = k.size[0] + rnd() * k.size[1];
+      s.set(sz, sz, sz);
+      p.copy(B(d[o], d[o + 1], d[o + 2])).addScaledVector(nrm, k.off);
+      m4.compose(p, q, s);
+      im.setMatrixAt(j, m4);
+      const f = 1.12 * (0.85 + 0.3 * rnd());
+      col.setRGB(Math.min(1, d[o + 6] / 255 * f), Math.min(1, d[o + 7] / 255 * f), Math.min(1, d[o + 8] / 255 * f),
+        THREE.SRGBColorSpace);
+      if (k.tilt < 1 && rnd() < 0.22) col.multiplyScalar(1.3).add(SHEEN);   // ivy is glossy: some leaves catch the sky
+      im.setColorAt(j, col);
+    });
+    im.frustumCulled = false;
+    scene.add(im);
+    treeMeshes.push(im);
+  }
+  applyAdaptation();
+  dirty = 5;
+}
+
+async function buildTrees(meta) {
+  const byV = {};
+  for (const t of meta.trees) (byV[t.v] ||= []).push(t);
+  await Promise.all(Object.entries(meta.cards).map(async ([v, card]) => {
+    const list = byV[v] || [];
+    if (!list.length) { progress('Trees'); return; }
+    const tex = await loadTex(`assets/tex/tree_${v}_${Q}.webp${VER}`, { flip: true });
+    const mat = new THREE.MeshBasicMaterial({ map: tex, alphaTest: 0.45, side: THREE.DoubleSide, alphaToCoverage: !MOBILE });
+    treeMats.push(mat);
+    const S = card.size, geo = new THREE.PlaneGeometry(S, S);
+    geo.translate(0, card.bottom + S / 2, 0);
+    for (const rot of [0, Math.PI / 2]) {
+      const im = new THREE.InstancedMesh(geo, mat, list.length);
+      const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3();
+      list.forEach((t, i) => {
+        q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), t.rz + rot);
+        s.set(t.s, t.sz, t.s); p.set(t.x, t.z || 0, -t.y);
+        m4.compose(p, q, s); im.setMatrixAt(i, m4);
+      });
+      im.frustumCulled = false;
+      scene.add(im);
+      treeMeshes.push(im);
+    }
+    progress('Trees');
+  }));
+  applyAdaptation();
+  dirty = 5;
+}
+
+// ------------------------------------------------------------------ living lawn: real grass blades around the viewer
+// A top-down capture of the baked grounds gives the lawn's lit colour (tree and house shadows included) and a
+// lawn-only mask; instanced blades then fill a square around the camera. Each blade keeps a fixed spot in the
+// world (positions wrap around the viewer), so walking feels like moving over grass, not over a printed carpet.
+const LAWN = { x0: -9, y0: -11, size: 38 };                  // Blender metres covering the lawn (scripts/site.py)
+let grass = null;
+
+function captureLawn() {
+  const res = MOBILE ? 1024 : 2048;
+  const { x0, y0, size } = LAWN, cx = x0 + size / 2, cy = y0 + size / 2;
+  const cam = new THREE.OrthographicCamera(-size / 2, size / 2, size / 2, -size / 2, 1, 400);
+  cam.up.set(0, 0, -1);
+  cam.position.copy(B(cx, cy, 200));
+  cam.lookAt(B(cx, cy, 0));
+  const saved = adapt;
+  adapt = 0; applyAdaptation();
+  for (const m of treeMeshes) m.visible = false;
+  const opts = { generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter };
+  const colorRT = new THREE.WebGLRenderTarget(res, res, { ...opts, type: THREE.HalfFloatType });
+  const maskRT = new THREE.WebGLRenderTarget(res, res, opts);
+  const prevBg = scene.background, prevFog = scene.fog;
+  scene.background = new THREE.Color(0, 0, 0);
+  scene.fog = null;
+  renderer.setRenderTarget(colorRT);
+  renderer.render(scene, cam);
+  // mask: lawn surfaces white, everything else (paths, hedges, beds, buildings) black
+  const white = new THREE.MeshBasicMaterial({ color: 0xffffff }), black = new THREE.MeshBasicMaterial({ color: 0x000000 });
+  const swapped = [];
+  scene.traverse((o) => {
+    if (!o.isMesh || o.isInstancedMesh) return;
+    swapped.push([o, o.material]);
+    const pick = (m) => (m.userData && /leafy_grass/.test(m.userData.srcName || '') ? white : black);
+    o.material = Array.isArray(o.material) ? o.material.map(pick) : pick(o.material);
+  });
+  if (farGround) farGround.visible = false;
+  renderer.setRenderTarget(maskRT);
+  renderer.render(scene, cam);
+  renderer.setRenderTarget(null);
+  for (const [o, m] of swapped) o.material = m;
+  if (farGround) farGround.visible = true;
+  scene.background = prevBg;
+  scene.fog = prevFog;
+  for (const m of treeMeshes) m.visible = true;
+  adapt = saved; applyAdaptation();
+  return { color: colorRT.texture, mask: maskRT.texture };
+}
+
+function buildGrass() {
+  const { color, mask } = captureLawn();
+  const S = MOBILE ? 11 : 18, N = MOBILE ? 30000 : 150000;
+  const base = new THREE.BufferGeometry();
+  base.setAttribute('position', new THREE.Float32BufferAttribute([-0.5, 0, 0, 0.5, 0, 0, -0.35, 0.5, 0, 0.35, 0.5, 0, 0, 1, 0], 3));
+  base.setIndex([0, 1, 2, 1, 3, 2, 2, 3, 4]);
+  const geo = new THREE.InstancedBufferGeometry();
+  geo.index = base.index;
+  geo.attributes.position = base.attributes.position;
+  const off = new Float32Array(N * 2);
+  for (let i = 0; i < N * 2; i++) off[i] = Math.random() * S;
+  geo.setAttribute('aOff', new THREE.InstancedBufferAttribute(off, 2));
+  geo.instanceCount = N;
+  const mat = new THREE.ShaderMaterial({
+    side: THREE.DoubleSide,
+    uniforms: {
+      uCam: { value: new THREE.Vector3() }, uS: { value: S }, uMask: { value: mask }, uColor: { value: color },
+      uLawn: { value: new THREE.Vector3(LAWN.x0, LAWN.y0, LAWN.size) }, uTime: { value: 0 }, uWind: { value: FX ? 0.22 : 0 },
+      uK: { value: 1 },
+    },
+    vertexShader: `
+      uniform vec3 uCam; uniform float uS; uniform sampler2D uMask; uniform sampler2D uColor;
+      uniform vec3 uLawn; uniform float uTime; uniform float uWind;
+      attribute vec2 aOff;
+      varying vec3 vCol;
+      float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      void main() {
+        vec2 rel = mod(aOff - uCam.xz + 0.5 * uS, uS) - 0.5 * uS;
+        vec2 wp = uCam.xz + rel;
+        vec2 buv = vec2((wp.x - uLawn.x) / uLawn.z, (-wp.y - uLawn.y) / uLawn.z);
+        float inside = step(0.0, buv.x) * step(buv.x, 1.0) * step(0.0, buv.y) * step(buv.y, 1.0);
+        float m = texture2D(uMask, buv).r * inside;
+        float h1 = hash(floor(wp * 173.0)), h2 = hash(wp.yx * 31.7 + 3.1);
+        float fade = smoothstep(0.5 * uS, 0.34 * uS, length(rel));
+        float hgt = mix(0.04, 0.095, h1 * h1) * smoothstep(0.55, 0.9, m) * fade;
+        float ang = h2 * 6.2831;
+        float t = position.y;
+        float w = mix(0.008, 0.015, h2);
+        vec2 dir = vec2(cos(ang), sin(ang));
+        vec2 lean = vec2(cos(ang * 1.7 + 1.0), sin(ang * 1.7 + 1.0)) * (0.2 + 0.45 * h1) * hgt;
+        float sway = sin(uTime * 1.7 + wp.x * 0.8 + wp.y * 0.55) * uWind * hgt;
+        float by = -wp.y;                                // Blender y; the lawn eases down towards the drive
+        float gz = by >= -4.0 ? 0.0 : (by >= -14.0 ? -0.09 * (-4.0 - by) : -0.9 - 0.10 * (-14.0 - by));
+        vec3 p = vec3(wp.x, gz, wp.y);
+        p.xz += dir * position.x * w;
+        p.y += t * hgt;
+        p.xz += (lean + vec2(sway, 0.6 * sway)) * t * t;
+        vec3 lawn = texture2D(uColor, buv).rgb;
+        vCol = lawn * (0.55 + 0.75 * t) * (0.86 + 0.28 * h2) * vec3(1.0, 1.0 + 0.06 * (h1 - 0.5), 1.0 - 0.1 * h2);
+        gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
+      }`,
+    fragmentShader: `
+      uniform float uK;
+      varying vec3 vCol;
+      void main() {
+        gl_FragColor = vec4(vCol * uK, 1.0);
+        #include <colorspace_fragment>
+      }`,
+  });
+  grass = new THREE.Mesh(geo, mat);
+  grass.frustumCulled = false;
+  grass.renderOrder = 1;
+  scene.add(grass);
+}
+
+// mirrors: the baked mirror mesh is split into its mirrors (same facing, within 0.9 m), and each glass becomes a
+// Reflector -- a live planar reflection of its own room. One captured probe for every mirror showed the kitchen in
+// the bathroom mirror (Rowan House, 6 Oct 2026).
+let inMirror = false;
+function setupMirrors(root) {
+  const meshes = [];
+  root.traverse((o) => { if (o.isMesh && o.material === mirrorMat) meshes.push(o); });
+  const size = MOBILE ? 256 : 512, Y = new THREE.Vector3(0, 1, 0);
+  for (const m of meshes) {
+    m.updateMatrixWorld(true);
+    const pos = m.geometry.attributes.position, idx = m.geometry.index, cnt = idx ? idx.count : pos.count;
+    const P3 = (i) => new THREE.Vector3().fromBufferAttribute(pos, idx ? idx.getX(i) : i).applyMatrix4(m.matrixWorld);
+    const clusters = [];
+    for (let i = 0; i < cnt; i += 3) {
+      const a = P3(i), b = P3(i + 1), c = P3(i + 2);
+      const n = new THREE.Vector3().subVectors(b, a).cross(new THREE.Vector3().subVectors(c, a));
+      const area = n.length() / 2;
+      if (area < 1e-6) continue;
+      n.normalize();
+      if (Math.abs(n.y) > 0.5) continue;                     // only upright glass, not rims or tops
+      const ctr = a.clone().add(b).add(c).divideScalar(3);
+      let cl = clusters.find((q) => q.n.dot(n) > 0.99 && q.c0.distanceTo(ctr) < 0.9);
+      if (!cl) { cl = { n, c0: ctr, tris: [] }; clusters.push(cl); }
+      cl.tris.push({ a, b, c, area, ctr });
+    }
+    for (const cl of clusters) {
+      const n = cl.n, front = Math.max(...cl.tris.map((t) => t.ctr.dot(n)));
+      const tr = cl.tris.filter((t) => front - t.ctr.dot(n) < 0.003);          // the glass: its frontmost plane
+      const u = new THREE.Vector3().crossVectors(Y, n).normalize(), v = new THREE.Vector3().crossVectors(n, u);
+      const c = new THREE.Vector3();
+      let A = 0;
+      for (const t of tr) { c.addScaledVector(t.ctr, t.area); A += t.area; }
+      if (A < 0.01) continue;
+      c.divideScalar(A);
+      const arr = [];
+      for (const t of tr) {
+        let q = [t.a, t.b, t.c].map((p) => [p.clone().sub(c).dot(u), p.clone().sub(c).dot(v)]);
+        if ((q[1][0] - q[0][0]) * (q[2][1] - q[0][1]) - (q[2][0] - q[0][0]) * (q[1][1] - q[0][1]) < 0) q = [q[0], q[2], q[1]];
+        for (const [x, y] of q) arr.push(x, y, 0);
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3));
+      const r = new Reflector(geo, { textureWidth: size, textureHeight: size, clipBias: 0.003, color: 0xc8c8c8 });
+      r.position.copy(c).addScaledVector(n, 0.001);
+      r.lookAt(r.position.clone().add(n));
+      r.updateMatrix();
+      r.matrixAutoUpdate = false;
+      const own = r.onBeforeRender;
+      r.onBeforeRender = function (rd, sc, cam) {
+        if (inMirror || cam.position.distanceTo(this.position) > 8) return;
+        inMirror = true;
+        try { own.call(this, rd, sc, cam); } finally { inMirror = false; }
+      };
+      scene.add(r);
+    }
+    m.visible = false;
+  }
+}
+
+// reflection probes: cube maps rendered once from inside each space, prefiltered (PMREM) for rough reflections
+function bakeProbes() {
+  const size = MOBILE ? 128 : 256;
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const raw = {}, pre = {};
+  const savedAdapt = adapt;
+  for (const [z, pr] of Object.entries(PROBES)) {
+    adapt = INTERIOR.has(z) ? 1 : 0; applyAdaptation();
+    const rt = new THREE.WebGLCubeRenderTarget(size, { type: THREE.HalfFloatType, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter });
+    const cc = new THREE.CubeCamera(0.05, 400, rt);
+    cc.position.copy(B(...pr.p));
+    cc.update(renderer, scene);
+    raw[z] = rt.texture;
+    pre[z] = pmrem.fromCubemap(rt.texture).texture;
+  }
+  pmrem.dispose();
+  adapt = savedAdapt;
+  for (const g of GROUPS) for (const m of groupMats[g]) { m.envMap = pre[m.userData.probe || ZONE_PROBE[g] || 'GF']; m.needsUpdate = true; }
+  for (const m of glassMats) { m.envMap = raw.EXT; m.needsUpdate = true; }
+  if (mirrorMat) { mirrorMat.envMap = raw.BATH; mirrorMat.needsUpdate = true; }
+  applyAdaptation();
+  dirty = 5;
+}
+
+// ------------------------------------------------------------------ simulation + render loop
+const clock = new THREE.Clock();
+let fpsAcc = 0, fpsN = 0, lastZone = '';
+function step(dt) {
+  // desired velocity from keys / stick
+  let fx = 0, fy = 0;
+  if (keys.has('w') || keys.has('arrowup')) fy += 1;
+  if (keys.has('s') || keys.has('arrowdown')) fy -= 1;
+  if (keys.has('a')) fx -= 1;
+  if (keys.has('d')) fx += 1;
+  if (keys.has('arrowleft') || keys.has('q')) targetYaw += 1.6 * dt;
+  if (keys.has('arrowright') || keys.has('e')) targetYaw -= 1.6 * dt;
+  if (stick && stick.ax !== undefined) { fx += stick.ax; fy -= stick.ay; }
+  const mag = Math.min(1, Math.hypot(fx, fy));
+  // brisk walking pace; Shift (or the stick pushed to its edge on a phone) to hurry
+  const speed = (keys.has('shift') || (stick && mag > 0.93)) ? 5.5 : 3.5;     // 2.5 felt slow in review (5 Oct)
+  let dvx = 0, dvy = 0;
+  if (mag > 0.05) {
+    const cy = Math.cos(P.yaw), sy = Math.sin(P.yaw), n = Math.hypot(fx, fy) || 1;
+    dvx = (cy * fy / n + sy * fx / n) * speed * mag;
+    dvy = (sy * fy / n - cy * fx / n) * speed * mag;
+  } else if (route) {
+    const tgt = route.pts[route.i];
+    const dx = tgt[1] - P.x, dy = tgt[2] - P.y, d = Math.hypot(dx, dy);
+    const last = route.i === route.pts.length - 1;
+    if (d < (last ? 0.06 : 0.35)) {
+      if (last) {
+        if (route.endLook) { targetYaw = route.endLook[0]; targetPitch = route.endLook[1]; }
+        route = null; mapTarget = null; mapDirty = true;
+      } else route.i++;
+    } else {
+      const v = Math.min(4.5, last ? Math.max(0.45, d * 2.4) : 4.5);
+      dvx = dx / d * v; dvy = dy / d * v;
+      if (route.turn && (!route.endLook || !last || d > 1.2)) {
+        const want = Math.atan2(dy, dx);
+        let dd = want - targetYaw; dd = Math.atan2(Math.sin(dd), Math.cos(dd));
+        targetYaw += dd * Math.min(1, dt * 2.2);
+        targetPitch += (-0.05 - targetPitch) * Math.min(1, dt * 1.5);
+      } else if (route.endLook) {
+        let dd = route.endLook[0] - targetYaw; dd = Math.atan2(Math.sin(dd), Math.cos(dd));
+        targetYaw += dd * Math.min(1, dt * 2.5);
+        targetPitch += (route.endLook[1] - targetPitch) * Math.min(1, dt * 2.5);
+      }
+    }
+  }
+  // smooth acceleration
+  const a = 1 - Math.exp(-dt * 9);                                // quicker to get up to pace
+  P.vx += (dvx - P.vx) * a; P.vy += (dvy - P.vy) * a;
+  const nx = P.x + P.vx * dt, ny = P.y + P.vy * dt;
+  if (Math.abs(P.vx) + Math.abs(P.vy) > 1e-4) {
+    if (walkable(P.L, nx, ny)) { P.x = nx; P.y = ny; }
+    else if (walkable(P.L, nx, P.y)) { P.x = nx; P.vy *= 0.5; }
+    else if (walkable(P.L, P.x, ny)) { P.y = ny; P.vx *= 0.5; }
+    else {
+      // sidestep around a corner instead of stopping
+      const sp = Math.hypot(P.vx, P.vy), base = Math.atan2(P.vy, P.vx);
+      let moved = false;
+      for (const off of [0.5, -0.5, 1.0, -1.0, 1.4, -1.4]) {
+        const ax = P.x + Math.cos(base + off) * sp * dt, ay = P.y + Math.sin(base + off) * sp * dt;
+        if (walkable(P.L, ax, ay)) { P.x = ax; P.y = ay; moved = true; break; }
+      }
+      if (!moved) { P.vx = P.vy = 0; if (route && ++route.stuck > 20) route = null; }
+    }
+    P.L = levelAt(P.L, P.x, P.y);
+  }
+  // smooth look + height
+  const la = 1 - Math.exp(-dt * 10);
+  let dyaw = targetYaw - P.yaw; dyaw = Math.atan2(Math.sin(dyaw), Math.cos(dyaw));
+  P.yaw += dyaw * la; P.pitch += (targetPitch - P.pitch) * la;
+  const ez = floorZ(P.L, P.x, P.y) + eyeHeight(P.L, P.x, P.y);
+  P.z += (ez - P.z) * (1 - Math.exp(-dt * 9));
+  // light adaptation
+  const inside = P.L === 1 || INSIDE(P.x, P.y);
+  const aT = inside ? 1 : 0;
+  if (Math.abs(aT - adapt) > 0.002) { adapt += (aT - adapt) * (1 - Math.exp(-dt * 1.8)); applyAdaptation(); dirty = 2; }
+  const moving = Math.abs(P.vx) + Math.abs(P.vy) > 0.003 || Math.abs(dyaw) > 0.0005 || Math.abs(targetPitch - P.pitch) > 0.0005 || Math.abs(ez - P.z) > 0.001 || route;
+  if (moving) dirty = Math.max(dirty, 2);
+  const zn = zoneName(P.L, P.x, P.y);
+  if (zn !== lastZone) { lastZone = zn; whereEl.textContent = zn; }
+}
+
+function frame() {
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.05, clock.getDelta());
+  step(dt);
+  if (dirty > 0 || route) mapDirty = true;
+  if (grass && grass.visible && FX) dirty = Math.max(dirty, 1);     // grass sways in the breeze outdoors (desktop)
+  if (mapDirty) drawMap();
+  if (dirty <= 0) return;
+  dirty--;
+  const eye = B(P.x, P.y, P.z);
+  if (grass) {
+    grass.visible = adapt < 0.95 && P.L === 0;
+    grass.material.uniforms.uCam.value.copy(eye);
+    grass.material.uniforms.uTime.value = clock.elapsedTime;
+  }
+  // dynamic resolution to stay smooth -- applied BEFORE drawing: resizing the canvas wipes it, so a resize
+  // after the draw put one black frame on screen at every step
+  fpsAcc += dt; fpsN++;
+  if (fpsN >= 45) {
+    const avg = fpsAcc / fpsN; fpsAcc = 0; fpsN = 0;
+    const floor = MOBILE ? 0.8 : 1.0, ceil = Math.min(devicePixelRatio, MOBILE ? 1.6 : 2);
+    if (avg > 1 / 45 && pixelRatio > floor) { pixelRatio = Math.max(floor, pixelRatio - 0.2); renderer.setPixelRatio(pixelRatio); resize(); }
+    else if (avg < 1 / 58 && pixelRatio < ceil) { pixelRatio = Math.min(ceil, pixelRatio + 0.1); renderer.setPixelRatio(pixelRatio); resize(); }
+  }
+  camera.position.copy(eye);
+  const cp = Math.cos(P.pitch);
+  camera.lookAt(B(P.x + Math.cos(P.yaw) * cp, P.y + Math.sin(P.yaw) * cp, P.z + Math.sin(P.pitch)));
+  if (composer) composer.render(); else renderer.render(scene, camera);
+}
+
+start().catch((err) => {
+  console.error(err);
+  const e = $('#err'); e.hidden = false;
+  e.textContent = 'The walkthrough could not load: ' + (err && err.message ? err.message : err) + '. Reload the page to try again.';
+});
+requestAnimationFrame(frame);
+</script>
