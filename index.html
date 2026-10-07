@@ -230,7 +230,7 @@ const COARSE = matchMedia('(pointer: coarse)').matches;
 if (COARSE) document.documentElement.classList.add('touch');
 const MOBILE = COARSE || Math.min(screen.width, screen.height) < 700;
 const Q = MOBILE ? 'lo' : 'hi';
-const VER = '?v=1.1';           // bump on every republish so browsers never mix old and new assets
+const VER = '?v=1.2';           // bump on every republish so browsers never mix old and new assets
 const $ = (s) => document.querySelector(s);
 const statusEl = $('#status'), barEl = $('#bar i');
 
@@ -420,6 +420,7 @@ function webMaterial(name) {
       opacity: kind === 'glass_obscure' ? 0.55 : kind === 'glass_dark' ? 0.55 : 0.07,
       depthWrite: false, side: THREE.DoubleSide, combine: THREE.AddOperation, reflectivity: 0.35,
     });
+    if (kind === 'glass_cabinet') { m.opacity = 0.12; m.color.set(0x05070a); m.userData.indoor = true; }
     glassMats.push(m);
     return m;
   }
@@ -1539,7 +1540,7 @@ function bakeProbes() {
   pmrem.dispose();
   adapt = savedAdapt;
   for (const g of GROUPS) for (const m of groupMats[g]) { m.envMap = pre[m.userData.probe || ZONE_PROBE[g] || 'GF']; m.needsUpdate = true; }
-  for (const m of glassMats) { m.envMap = raw.EXT; m.needsUpdate = true; }
+  for (const m of glassMats) { if (!m.userData.indoor) m.envMap = raw.EXT; m.needsUpdate = true; }
   if (mirrorMat) { mirrorMat.envMap = raw.BATH; mirrorMat.needsUpdate = true; }
   applyAdaptation();
   dirty = 5;
